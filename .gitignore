@@ -1,0 +1,17 @@
+## Build outputs
+bin/
+obj/
+
+## IDE
+.vs/
+*.user
+*.suo
+*.Backup.tmp
+.idea/
+
+## Local environment overrides — never commit
+appsettings.Local.json
+
+## OS
+.DS_Store
+Thumbs.db

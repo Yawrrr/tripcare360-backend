@@ -1,0 +1,7 @@
+<Solution>
+  <Folder Name="/Solution Items/" />
+  <Project Path="Tripcare360.Application/Tripcare360.Application.csproj" />
+  <Project Path="Tripcare360.Domain/Tripcare360.Domain.csproj" />
+  <Project Path="Tripcare360.Infrastructure/Tripcare360.Infrastructure.csproj" />
+  <Project Path="Tripcare360.WebApi/Tripcare360.WebApi.csproj" />
+</Solution>
