@@ -6,10 +6,19 @@ namespace Tripcare360.Domain.Entities.Claim;
 public class ClaimEntity : BaseEntity
 {
     public Guid Id { get; set; } = Guid.NewGuid();
+    public required string ClaimCode { get; set; }
     public required string PolicyNumber { get; set; }
     public required string IdentityNumber { get; set; }
-    public required string FlightNumber { get; set; }
+    public required string InsuredName { get; set; }
+    public TravelRoute Route { get; set; }
+    public PolicyTier Tier { get; set; }
     public ClaimType Type { get; set; }
-    public decimal EstimatedPayout { get; set; }
-    public ClaimStatus Status { get; set; } = ClaimStatus.Submitted;
+    public decimal SubmittedAmount { get; set; }
+    public decimal CalculatedPayout { get; set; }
+    public required string IncidentDetailsJson { get; set; }
+    public List<string> FileObjectKeys { get; set; } = [];
+    public bool IsPreValidationFailedDueToOutage { get; set; } = false;
+    public string? AdminComments { get; set; }
+    public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
+    public DateTime? ProcessedAt { get; set; }
 }

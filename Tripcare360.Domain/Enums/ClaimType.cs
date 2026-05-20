@@ -1,18 +1,58 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+namespace Tripcare360.Domain.Enums;
 
-namespace Tripcare360.Domain.Enums
+public enum ClaimType
 {
-    public enum ClaimType
-    {
-        FlightDelay,
-        BaggageDelay,
-        MedicalExpenses,
-        TripCancellation,
-        LostDocuments,
-        PersonalAccident
-    }
+    [ClaimCategory(ClaimCategory.PersonalAccident)]
+    DeathOrPermanentDisability,
+
+    [ClaimCategory(ClaimCategory.MedicalAndExpenses)]
+    MedicalExpenses,
+
+    [ClaimCategory(ClaimCategory.MedicalAndExpenses)]
+    FollowUpTreatment,
+
+    [ClaimCategory(ClaimCategory.MedicalAndExpenses)]
+    AlternativeTreatment,
+
+    [ClaimCategory(ClaimCategory.MedicalAndExpenses)]
+    HospitalConfinement,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    TripCancellation,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    TripCurtailment,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    FlightDelay,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    BaggageDelay,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    MissedConnection,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    HijackInconvenience,
+
+    [ClaimCategory(ClaimCategory.PersonalBelongings)]
+    BaggageLossAndPersonalEffects,
+
+    [ClaimCategory(ClaimCategory.PersonalBelongings)]
+    PersonalMoneyLoss,
+
+    [ClaimCategory(ClaimCategory.PersonalBelongings)]
+    TravelDocumentsLoss,
+
+    [ClaimCategory(ClaimCategory.TravelInconveniences)]
+    HomeCare,
+
+    [ClaimCategory(ClaimCategory.Liability)]
+    PersonalLiability,
+
+    [ClaimCategory(ClaimCategory.EmergencyServices)]
+    EmergencyEvacuation,
+
+    [ClaimCategory(ClaimCategory.EmergencyServices)]
+    RepatriationOfRemains
 }
