@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Solution Overview
 
-TripCare360 backend is a **.NET 9 Clean Architecture** solution (`tripcare360.slnx`) for a travel insurance claim system. It handles flight-delay claim submission with STP (Straight-Through Processing) auto-approval logic.
+TripCare360 backend is a **.NET 9 Clean Architecture** solution for a travel insurance claim system. It implements a multi-step claim submission flow — policy verification, claim type selection, pre-validation with file uploads, finalization, and real-time status broadcasting via SSE — against the Etiqa insurance domain.
 
 ## Build & Run
 
@@ -23,6 +23,9 @@ dotnet test
 
 # Run a single test by name
 dotnet test --filter "FullyQualifiedName~TestMethodName"
+
+# Add an EF Core migration (always specify both projects)
+dotnet-ef migrations add <MigrationName> --project Tripcare360.Infrastructure --startup-project Tripcare360.WebApi
 ```
 
 ## Architecture
@@ -37,146 +40,138 @@ Domain  ←  Application  ←  Infrastructure
 
 | Project | Role |
 |---|---|
-| `Tripcare360.Domain` | Entities, enums, `ApiException`, `ErrorCode`. Zero dependencies. |
-| `Tripcare360.Application` | Use cases (MediatR + FluentValidation), DTOs, mappers, interface contracts. |
-| `Tripcare360.Infrastructure` | EF Core DbContext, `RojakkkService`, `ClaimRepository`. |
-| `Tripcare360.WebApi` | Controllers, middleware pipeline, DI wiring, response envelope. |
+| `Tripcare360.Domain` | Entities, enums, custom attributes, `ApiException`, `ErrorCode`. Zero dependencies. |
+| `Tripcare360.Application` | Use cases (MediatR + FluentValidation), DTOs, mappers, service and repository interface contracts. |
+| `Tripcare360.Infrastructure` | EF Core DbContext, HTTP client adapters, MinIO storage service, SSE broadcaster, repositories. |
+| `Tripcare360.WebApi` | Controllers, middleware pipeline, DI wiring, multipart form binding, response envelope. |
 
-## Project Structure
+## API Surface
 
-### Tripcare360.Domain
-```
-Entities/
-  Common/
-    BaseEntity.cs         — abstract base: CreatedAt, UpdatedAt (UpdatedAt auto-set by DbContext on save)
-  Claim/
-    ClaimEntity.cs        — main aggregate (Id, PolicyNumber, IdentityNumber, FlightNumber, Type, EstimatedPayout, Status) + BaseEntity
-  Errors/
-    ErrorCode.cs          — static registry of typed error definitions (Code, ErrorMsg, Details)
-    ApiException.cs       — custom exception: ApiException(ErrorCode, msg?, details?)
-Enums/
-  ClaimStatus.cs          — Submitted | StpApproved | ManualReview | Rejected
-  ClaimType.cs            — FlightDelay | BaggageDelay | MedicalExpenses | TripCancellation | LostDocuments | PersonalAccident
-```
+| Method | Route | Purpose |
+|---|---|---|
+| `POST` | `/api/policy/verify` | Step 1 — verify policy number + identity against the external policy registry |
+| `POST` | `/api/claim/verify` | Step 3 — pre-validate incident data, upload files to MinIO, reserve claim as `Pending` |
+| `POST` | `/api/claim` | Step 4 — finalize submission; enforces 10-minute reservation window |
+| `GET` | `/api/claim/sse/{claimCode}` | Step 5 — SSE stream for real-time status updates |
 
-### Tripcare360.Application
-```
-DependencyInjection.cs            — AddApplicationServices() registers MediatR + FluentValidation pipeline
-Common/
-  Behaviours/
-    ValidationBehaviour.cs        — MediatR pipeline: runs nested Validators before every handler
-Dtos/
-  Claim/
-    SubmitClaimRequest.cs         — inbound request DTO
-    SubmitClaimResponse.cs        — outbound response DTO
-Features/
-  Claim/
-    Commands/
-      SubmitClaimCommand.cs       — self-contained class: primary ctor + nested Validator + nested Handler
-    Queries/                      — empty, ready for future read operations
-Interfaces/
-  Repositories/
-    IGenericRepository.cs     — base CRUD interface: GetByIdAsync, GetAllAsync, AddAsync, UpdateAsync, DeleteAsync
-    IClaimRepository.cs       — extends IGenericRepository<ClaimEntity>; add claim-specific methods here
-  Services/
-    IRojakkkService.cs
-Mappers/
-  ClaimMapper.cs                  — ToCommand() (request → command) and ToResponse() (entity → response DTO)
-```
+## Claim Flow
 
-### Tripcare360.Infrastructure
 ```
-DependencyInjection.cs            — AddInfrastructureServices() registers DbContext, services, repositories
-Persistence/
-  Tripcare360DbContext.cs         — EF Core; enums stored as strings; SaveChangesAsync auto-sets UpdatedAt on modified BaseEntity instances
-Repositories/
-  GenericRepository.cs            — base EF Core implementation of IGenericRepository<T>; exposes protected Db field
-  ClaimRepository.cs              — extends GenericRepository<ClaimEntity>, implements IClaimRepository
-Services/
-  RojakkkService.cs               — implements IRojakkkService (mock: MH123 → delayed)
-```
+Step 1  POST /api/policy/verify
+          → calls external policy registry → returns eligible claim types
 
-### Tripcare360.WebApi
-```
-DependencyInjection.cs            — AddWebApiServices() registers controllers + CORS
-Controllers/
-  ClaimsController.cs             — POST /api/claims → dispatches SubmitClaimCommand via ISender
-Middleware/
-  ExceptionHandlerMiddleware.cs   — outermost; catches ApiException → ErrorResponse, unhandled → SYS_001
-  ResponseWrapperMiddleware.cs    — wraps 2xx responses in SuccessResponse<T>
-Responses/
-  ApiResponse.cs                  — SuccessResponse<T> and ErrorResponse records
-Program.cs                        — wires DI extensions + middleware order
-appsettings.json                  — non-sensitive defaults (LocalDB connection string)
-appsettings.Local.json            — git-ignored local overrides (secrets, env-specific values)
+Step 2  (frontend-only)
+          → filters claim type cards based on eligible types returned from Step 1
+
+Step 3  POST /api/claim/verify  (multipart/form-data)
+          → for flight claims: calls external flight status registry
+              delay threshold not met → 400 AutomatedCheckFailed
+              service outage         → bypass, IsPreValidationFailedDueToOutage = true
+          → uploads supporting files to MinIO
+          → saves claim as Pending, generates ClaimCode (CLM-YYYYMMDD-XXXX)
+          → returns ClaimCode + CalculatedPayout + ExpiresAt (CreatedAt + 10 min)
+
+Step 4  POST /api/claim
+          → checks claim is Pending and within 10-minute window
+          → transitions Pending → Submitted
+          → returns final status
+
+Step 5  GET /api/claim/sse/{claimCode}
+          → SSE stream stays open; admin actions or STP logic push events
+          → PaymentSuccess closes the connection; ManualReviewNeeded keeps it open
 ```
 
 ## Key Conventions
 
-**CQRS structure** — one `.cs` file per command/query. The command is a **single self-contained class**: it is the `IRequest<T>`, holds the request DTO as a public property via primary constructor, and owns both `Validator` and `Handler` as nested classes — all within one set of curly braces. Queries go in `Features/<Feature>/Queries/`.
+### CQRS
+
+One file per command or query. Every command is a **single self-contained class**: it is the `IRequest<TResponse>`, takes the inbound DTO via primary constructor, and owns both `Validator` and `Handler` as nested classes.
 
 ```csharp
-public class SubmitClaimCommand(SubmitClaimRequest request) : IRequest<SubmitClaimResponse>
+public class DoSomethingCommand(DoSomethingRequest request) : IRequest<DoSomethingResponse>
 {
-    public SubmitClaimRequest Request { get; } = request;
+    public DoSomethingRequest Request { get; } = request;
 
-    public class Validator : AbstractValidator<SubmitClaimCommand>
+    public class Validator : AbstractValidator<DoSomethingCommand>
     {
         public Validator() { /* add rules here */ }
     }
 
-    public class Handler(IRojakkkService ...) : IRequestHandler<SubmitClaimCommand, SubmitClaimResponse>
+    public class Handler(IDependency dep) : IRequestHandler<DoSomethingCommand, DoSomethingResponse>
     {
-        public async Task<SubmitClaimResponse> Handle(SubmitClaimCommand command, CancellationToken ct)
+        public async Task<DoSomethingResponse> Handle(DoSomethingCommand command, CancellationToken ct)
         {
             var req = command.Request;
             // ... business logic ...
-            return entity.ToResponse();   // always use the mapper, never new Dto() inline
+            return entity.ToResponse();   // always use the mapper
         }
     }
 }
 ```
 
-- The command takes the request DTO via primary constructor and exposes it as `Request` — never duplicate the DTO's fields
-- `Validator` and `Handler` are **nested classes inside the command class**
-- Every command/query must have a `Validator`, even if the body is empty — populate rules later
-- The handler always returns via a **mapper extension** (`entity.ToResponse()`) — never construct the response DTO inline
-- `ValidationBehaviour` runs all validators automatically before the handler; no manual wiring needed per command
+- Never duplicate DTO fields on the command — expose the whole DTO as `Request`
+- Every command/query must have a `Validator` (even if empty)
+- `ValidationBehaviour` runs validators automatically — no manual wiring needed
+- The handler must return via a **mapper extension method**, never construct the response DTO inline
 
-**DTO naming and location** — DTOs are grouped by feature under `Dtos/<Feature>/`. Inbound DTOs use the `<Name>Request` suffix; outbound DTOs use the `<Name>Response` suffix (never `Result`).
+### DTOs
 
-**Mapper** — `ClaimMapper` owns all mapping for the Claim feature. Add a new static extension method per mapping direction. Never construct DTOs or commands inline in controllers or handlers.
+Grouped by feature under `Dtos/<Feature>/`. Inbound DTOs use the `<Name>Request` suffix; outbound DTOs use `<Name>Response` (never `Result`). A feature mapper owns all static extension methods for that feature — never construct DTOs or commands inline in controllers or handlers.
 
-**Entity naming** — all domain entities use the `<Name>Entity` suffix (e.g. `ClaimEntity`). Each entity lives in its own subfolder under `Domain/Entities/<Name>/`. Every entity must inherit `BaseEntity` (from `Domain/Entities/Common/`) to get `CreatedAt` and `UpdatedAt`; `UpdatedAt` is auto-stamped by `Tripcare360DbContext.SaveChangesAsync` on every EF Core `Modified` state — no manual setting needed.
+### Entities & BaseEntity
 
-**Repositories** — every entity-specific repository interface extends `IGenericRepository<TEntity>` (defined in `Application/Interfaces/Repositories/`). Every concrete repository inherits `GenericRepository<TEntity>` and implements its specific interface. The protected `Db` field on `GenericRepository` is available for custom EF Core queries in subclasses.
+All domain entities use the `<Name>Entity` suffix and inherit `BaseEntity`, which provides `CreatedAt` and `UpdatedAt` (`DateTimeOffset`). `UpdatedAt` is auto-stamped by `SaveChangesAsync` on every EF Core `Modified` entry — never set it manually. Each entity lives in its own subfolder under `Domain/Entities/<Name>/`.
 
-**Error codes** — add a `static readonly ErrorCode` entry to `Domain/Entities/Errors/ErrorCode.cs`. Codes prefixed `SYS` return HTTP 500; all others return HTTP 400.
+Incident detail types (flight, medical, baggage, etc.) are plain POCOs under `Domain/Entities/Claim/Incidents/` — they are serialized to JSON and stored in the `IncidentDetailsJson` column, not mapped as separate tables.
 
-**Response envelope** — controllers return plain DTOs. `ResponseWrapperMiddleware` wraps them:
+### Repositories
+
+Every entity-specific repository interface extends `IGenericRepository<TEntity>`. Every concrete repository inherits `GenericRepository<TEntity>` and implements its interface. The protected `Db` field on `GenericRepository` is available for custom EF Core queries in subclasses.
+
+### Enum Annotations
+
+`ClaimType` values are annotated with `[ClaimCategory(ClaimCategory.X)]`. Use reflection on the enum field to read the category — this drives dynamic UI filtering without hardcoding groupings in application logic.
+
+### External Service Clients
+
+HTTP adapters live in `Infrastructure/Clients/`. Their interfaces are defined in `Application/Interfaces/Services/` — the Application layer never references concrete HTTP types. Registered via `AddHttpClient<IInterface, Implementation>` with a base URL read from `IConfiguration["ExternalServices:BaseUrl"]`.
+
+Convention for all HTTP adapters:
+- `404` response → return `null`
+- Network / timeout exception → rethrow as a plain `Exception` (the caller decides whether to treat this as an outage bypass or a hard failure)
+
+### File Upload Abstraction
+
+The Application layer uses `ClaimFileUpload` (FileName, ContentType, Content, Length) instead of `IFormFile`, keeping the layer independent of ASP.NET Core. The WebApi layer maps `IFormFile → ClaimFileUpload` in the controller action before dispatching the command.
+
+### Outage Bypass
+
+If an external service throws a network exception during pre-validation, the handler catches it, sets `IsPreValidationFailedDueToOutage = true` on the claim, and proceeds to save it as `Pending`. This allows the user to continue while flagging the claim for manual review.
+
+### SSE Broadcasting
+
+`ISseEventBroadcaster` is registered as a **Singleton**. Handlers inject it and call `BroadcastStateAsync(claimCode, eventType, data)` after status transitions. The SSE controller registers a write delegate per `claimCode`, streams `text/event-stream`, and unregisters on disconnect or cancellation.
+
+### Error Codes
+
+Add a `static readonly ErrorCode` entry to `Domain/Entities/Errors/ErrorCode.cs`. Code prefix rules:
+- `SYS_*` → HTTP 500
+- All others → HTTP 400
+
+### Response Envelope
+
+Controllers return plain DTOs. `ResponseWrapperMiddleware` wraps all 2xx responses:
 ```json
 { "status": "Success", "data": { ... }, "timestamp": "...", "traceId": "..." }
 ```
 
-**Error handling** — throw `ApiException(ErrorCode.X)` anywhere in the Application layer. `ExceptionHandlerMiddleware` catches it and returns:
+Throw `ApiException(ErrorCode.X)` anywhere in the Application layer. `ExceptionHandlerMiddleware` catches it:
 ```json
 { "status": "Failed", "errorCode": "CLM_001", "errMsg": "...", "details": "...", "timestamp": "...", "traceId": "..." }
 ```
 
-**Middleware order** — `ExceptionHandlerMiddleware` must be registered before `ResponseWrapperMiddleware` in `Program.cs`.
+**Middleware order** — `ExceptionHandlerMiddleware` must be registered before `ResponseWrapperMiddleware`.
 
-**Environment config** — `appsettings.Local.json` is loaded optionally at startup and is git-ignored. Put secrets and local connection strings there, never in `appsettings.json`.
+### Config & Secrets
 
-## STP Flow
-
-```
-POST /api/claims
-  → ClaimsController.Submit([FromBody] SubmitClaimRequest)
-  → request.ToCommand() → SubmitClaimCommand
-  → MediatR → SubmitClaimCommand.Handler
-  → IRojakkkService.VerifyFlightDelayAsync
-      true  → ClaimStatus.StpApproved
-      false → ClaimStatus.ManualReview
-  → claim.ToResponse() → SubmitClaimResponse
-  → ResponseWrapperMiddleware → SuccessResponse<SubmitClaimResponse>
-```
+`appsettings.json` holds non-sensitive defaults only. `appsettings.Development.json` holds environment-specific values (external service URLs, MinIO credentials) and must be kept out of source control. Never put secrets in `appsettings.json`.
