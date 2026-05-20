@@ -47,8 +47,10 @@ Domain  ←  Application  ←  Infrastructure
 ### Tripcare360.Domain
 ```
 Entities/
+  Common/
+    BaseEntity.cs         — abstract base: CreatedAt, UpdatedAt (UpdatedAt auto-set by DbContext on save)
   Claim/
-    ClaimEntity.cs        — main aggregate (Id, PolicyNumber, IdentityNumber, FlightNumber, Type, EstimatedPayout, Status, CreatedAt)
+    ClaimEntity.cs        — main aggregate (Id, PolicyNumber, IdentityNumber, FlightNumber, Type, EstimatedPayout, Status) + BaseEntity
   Errors/
     ErrorCode.cs          — static registry of typed error definitions (Code, ErrorMsg, Details)
     ApiException.cs       — custom exception: ApiException(ErrorCode, msg?, details?)
@@ -86,7 +88,7 @@ Mappers/
 ```
 DependencyInjection.cs            — AddInfrastructureServices() registers DbContext, services, repositories
 Persistence/
-  Tripcare360DbContext.cs         — EF Core; enums stored as strings
+  Tripcare360DbContext.cs         — EF Core; enums stored as strings; SaveChangesAsync auto-sets UpdatedAt on modified BaseEntity instances
 Repositories/
   GenericRepository.cs            — base EF Core implementation of IGenericRepository<T>; exposes protected Db field
   ClaimRepository.cs              — extends GenericRepository<ClaimEntity>, implements IClaimRepository
@@ -145,7 +147,7 @@ public class SubmitClaimCommand(SubmitClaimRequest request) : IRequest<SubmitCla
 
 **Mapper** — `ClaimMapper` owns all mapping for the Claim feature. Add a new static extension method per mapping direction. Never construct DTOs or commands inline in controllers or handlers.
 
-**Entity naming** — all domain entities use the `<Name>Entity` suffix (e.g. `ClaimEntity`). Each entity lives in its own subfolder under `Domain/Entities/<Name>/`.
+**Entity naming** — all domain entities use the `<Name>Entity` suffix (e.g. `ClaimEntity`). Each entity lives in its own subfolder under `Domain/Entities/<Name>/`. Every entity must inherit `BaseEntity` (from `Domain/Entities/Common/`) to get `CreatedAt` and `UpdatedAt`; `UpdatedAt` is auto-stamped by `Tripcare360DbContext.SaveChangesAsync` on every EF Core `Modified` state — no manual setting needed.
 
 **Repositories** — every entity-specific repository interface extends `IGenericRepository<TEntity>` (defined in `Application/Interfaces/Repositories/`). Every concrete repository inherits `GenericRepository<TEntity>` and implements its specific interface. The protected `Db` field on `GenericRepository` is available for custom EF Core queries in subclasses.
 
