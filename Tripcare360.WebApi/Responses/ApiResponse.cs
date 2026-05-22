@@ -6,6 +6,6 @@ public record ErrorResponse(
     string Status,
     string ErrorCode,
     string ErrMsg,
-    string Details,
+    string ErrDetail,
     string Timestamp,
     string TraceId);

@@ -17,7 +17,8 @@ var app = builder.Build();
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseMiddleware<ResponseWrapperMiddleware>();
 app.UseCors("AllowNextJs");
-app.UseHttpsRedirection();
+app.UseWhen(ctx => ctx.Request.Path.Value?.Contains("/sse/") != true,
+    branch => branch.UseHttpsRedirection());
 app.MapControllers();
 
 app.Run();

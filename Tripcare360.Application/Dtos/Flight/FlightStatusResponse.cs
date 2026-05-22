@@ -5,7 +5,7 @@ public record FlightStatusResponse(
     DateTime DepartureDate,
     string AirlineName,
     bool IsDelayed,
-    int ActualDelayHours,
+    double ActualDelayHours,
     bool IsBaggageDelayed,
-    int BaggageDelayHours
+    double BaggageDelayHours
 );

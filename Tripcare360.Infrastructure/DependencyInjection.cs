@@ -38,6 +38,7 @@ public static class DependencyInjection
 
         services.AddScoped<IMinioStorageService, MinioStorageService>();
         services.AddScoped<IClaimRepository, ClaimRepository>();
+        services.AddHostedService<ClaimExpiryService>();
 
         return services;
     }

@@ -2,7 +2,8 @@ using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Tripcare360.Application.Dtos.Claim;
 using Tripcare360.Application.Features.Claim.Commands;
-using Tripcare360.Infrastructure.Services;
+using Tripcare360.Application.Features.Claim.Queries;
+using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.WebApi.Models;
 
 namespace Tripcare360.WebApi.Controllers;
@@ -15,8 +16,11 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
     public async Task<ReservationResponse> Reserve(
         [FromForm] ReservationFormInput input, CancellationToken ct)
     {
+        var labels = input.SupportingFileLabels ?? [];
         var files = input.SupportingFiles?
-            .Select(f => new ClaimFileUpload(f.FileName, f.ContentType, f.OpenReadStream(), f.Length))
+            .Select((f, i) => new ClaimFileUpload(
+                f.FileName, f.ContentType, f.OpenReadStream(), f.Length,
+                i < labels.Count ? labels[i] : "Supporting Document"))
             .ToList() ?? [];
 
         var request = new ReservationRequest(
@@ -25,6 +29,7 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
             input.InsuredName,
             input.Route,
             input.Tier,
+            input.InsuredAge,
             input.ClaimType,
             input.SubmittedAmount,
             input.IncidentDetailsJson,
@@ -37,6 +42,10 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
     public async Task<FinalizeClaimResponse> Finalize(
         [FromBody] FinalizeClaimRequest request, CancellationToken ct)
         => await sender.Send(new FinalizeClaimCommand(request), ct);
+
+    [HttpGet("{claimCode}")]
+    public async Task<ClaimStatusResponse> GetStatus(string claimCode, CancellationToken ct)
+        => await sender.Send(new GetClaimStatusQuery(claimCode), ct);
 
     [HttpGet("sse/{claimCode}")]
     public async Task Stream(string claimCode, CancellationToken ct)

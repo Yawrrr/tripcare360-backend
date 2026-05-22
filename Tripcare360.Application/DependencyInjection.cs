@@ -3,6 +3,8 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.DependencyInjection;
 using Tripcare360.Application.Common.Behaviours;
+using Tripcare360.Application.Features.Benefits;
+using Tripcare360.Application.Interfaces.Services;
 
 namespace Tripcare360.Application;
 
@@ -17,6 +19,8 @@ public static class DependencyInjection
         });
 
         services.AddValidatorsFromAssembly(Assembly.GetExecutingAssembly());
+
+        services.AddSingleton<IBenefitLimitsService, BenefitLimitsService>();
 
         return services;
     }

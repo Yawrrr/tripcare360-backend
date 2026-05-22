@@ -1,0 +1,16 @@
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: tripcare360-minio
+    command: server /data --console-address ":8001"
+    ports:
+      - "8000:9000"
+      - "8001:8001"
+    environment:
+      MINIO_ROOT_USER: tripcareAdmin
+      MINIO_ROOT_PASSWORD: tripcarePassword123
+    volumes:
+      - minio-data:/data
+
+volumes:
+  minio-data:

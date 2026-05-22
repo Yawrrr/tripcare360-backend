@@ -1,6 +1,7 @@
 using FluentValidation;
 using MediatR;
 using Tripcare360.Application.Dtos.Claim;
+using Tripcare360.Application.Features.Claim.Events;
 using Tripcare360.Application.Interfaces.Repositories;
 using Tripcare360.Application.Mappers;
 using Tripcare360.Domain.Entities.Errors;
@@ -22,7 +23,7 @@ public class FinalizeClaimCommand(FinalizeClaimRequest request) : IRequest<Final
         }
     }
 
-    public class Handler(IClaimRepository claimRepository)
+    public class Handler(IClaimRepository claimRepository, IPublisher publisher)
         : IRequestHandler<FinalizeClaimCommand, FinalizeClaimResponse>
     {
         private static readonly TimeSpan ReservationWindow = TimeSpan.FromMinutes(10);
@@ -43,6 +44,8 @@ public class FinalizeClaimCommand(FinalizeClaimRequest request) : IRequest<Final
             claim.ProcessedAt = DateTime.UtcNow;
 
             await claimRepository.UpdateAsync(claim);
+
+            await publisher.Publish(new ClaimFinalizedNotification(claim.ClaimCode), cancellationToken);
 
             return claim.ToFinalizeResponse();
         }

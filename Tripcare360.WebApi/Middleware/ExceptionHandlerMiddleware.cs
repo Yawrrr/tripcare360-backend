@@ -23,7 +23,7 @@ public class ExceptionHandlerMiddleware(RequestDelegate next, ILogger<ExceptionH
                 Status: "Failed",
                 ErrorCode: errorCode.Code,
                 ErrMsg: ex.Message,
-                Details: ex.OverrideDetails ?? errorCode.Details,
+                ErrDetail: ex.OverrideDetails ?? errorCode.ErrDetail,
                 Timestamp: DateTimeOffset.UtcNow.ToString("o"),
                 TraceId: context.TraceIdentifier));
         }
@@ -36,7 +36,7 @@ public class ExceptionHandlerMiddleware(RequestDelegate next, ILogger<ExceptionH
                 Status: "Failed",
                 ErrorCode: errorCode.Code,
                 ErrMsg: errorCode.ErrorMsg,
-                Details: errorCode.Details,
+                ErrDetail: ex.Message,
                 Timestamp: DateTimeOffset.UtcNow.ToString("o"),
                 TraceId: context.TraceIdentifier));
         }

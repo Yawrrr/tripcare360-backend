@@ -4,13 +4,6 @@ using Tripcare360.Application.Interfaces.Services;
 
 namespace Tripcare360.Infrastructure.Services;
 
-public interface ISseEventBroadcaster
-{
-    void RegisterClient(string claimCode, Func<string, string, Task> onEvent);
-    void UnregisterClient(string claimCode);
-    Task BroadcastStateAsync(string claimCode, string eventType, object data);
-}
-
 public class SseEventBroadcaster : ISseEventBroadcaster
 {
     private readonly ConcurrentDictionary<string, Func<string, string, Task>> _activeConnections = new();
