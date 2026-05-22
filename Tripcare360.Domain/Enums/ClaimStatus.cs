@@ -7,5 +7,7 @@ public enum ClaimStatus
     StpApproved,
     ManualReview,
     PendingDocs,
-    Rejected
+    Rejected,
+    Expired,
+    AdminApproved
 }
