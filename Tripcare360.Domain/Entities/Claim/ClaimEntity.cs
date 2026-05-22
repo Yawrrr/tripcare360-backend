@@ -12,11 +12,13 @@ public class ClaimEntity : BaseEntity
     public required string InsuredName { get; set; }
     public TravelRoute Route { get; set; }
     public PolicyTier Tier { get; set; }
+    public int InsuredAge { get; set; }
     public ClaimType Type { get; set; }
     public decimal SubmittedAmount { get; set; }
     public decimal CalculatedPayout { get; set; }
     public required string IncidentDetailsJson { get; set; }
     public List<string> FileObjectKeys { get; set; } = [];
+    public List<string> FileLabels { get; set; } = [];
     public bool IsPreValidationFailedDueToOutage { get; set; } = false;
     public string? AdminComments { get; set; }
     public ClaimStatus Status { get; set; } = ClaimStatus.Pending;

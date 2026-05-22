@@ -8,6 +8,7 @@ public record ReservationRequest(
     string InsuredName,
     TravelRoute Route,
     PolicyTier Tier,
+    int InsuredAge,
     ClaimType ClaimType,
     decimal SubmittedAmount,
     string IncidentDetailsJson,

@@ -1,5 +1,6 @@
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.Logging;
 using Tripcare360.Application.Dtos.Claim;
 using Tripcare360.Application.Interfaces.Repositories;
 using Tripcare360.Application.Interfaces.Services;
@@ -23,14 +24,16 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
             RuleFor(c => c.Request.IdentityNumber).NotEmpty();
             RuleFor(c => c.Request.InsuredName).NotEmpty();
             RuleFor(c => c.Request.IncidentDetailsJson).NotEmpty();
-            RuleFor(c => c.Request.SubmittedAmount).GreaterThan(0);
+            RuleFor(c => c.Request.SubmittedAmount).GreaterThanOrEqualTo(0);
         }
     }
 
     public class Handler(
         IClaimRepository claimRepository,
         ITravelStatusRegistryClient flightRegistry,
-        IMinioStorageService minioStorage)
+        IMinioStorageService minioStorage,
+        IBenefitLimitsService benefitLimits,
+        ILogger<Handler> logger)
         : IRequestHandler<PreValidateAndReserveCommand, ReservationResponse>
     {
         private static readonly ClaimType[] FlightClaimTypes =
@@ -41,6 +44,7 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
         {
             var req = command.Request;
             bool isOutageBypass = false;
+            double actualDelayHours = 0;
 
             if (FlightClaimTypes.Contains(req.ClaimType))
             {
@@ -63,6 +67,10 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                     if (!meetsThreshold)
                         throw new ApiException(ErrorCode.AutomatedCheckFailed,
                             details: $"Flight {flightNumber} operated on schedule or delay does not meet the minimum threshold.");
+
+                    actualDelayHours = req.ClaimType == ClaimType.FlightDelay
+                        ? flightStatus.ActualDelayHours
+                        : flightStatus.BaggageDelayHours;
                 }
                 catch (ApiException)
                 {
@@ -76,9 +84,19 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
 
             var claimCode = GenerateClaimCode();
             var fileKeys = new List<string>();
+            var fileLabels = new List<string>();
 
             foreach (var file in req.SupportingFiles)
+            {
                 fileKeys.Add(await minioStorage.UploadFileAsync(claimCode, file));
+                fileLabels.Add(file.Label);
+            }
+
+            var calculatedPayout = CalculatePayout(req, actualDelayHours, benefitLimits);
+
+            logger.LogInformation(
+                "[PreValidate] claimType={ClaimType} route={Route} tier={Tier} insuredAge={InsuredAge} actualDelayHours={ActualDelayHours} isOutageBypass={IsOutageBypass} calculatedPayout={CalculatedPayout}",
+                req.ClaimType, req.Route, req.Tier, req.InsuredAge, actualDelayHours, isOutageBypass, calculatedPayout);
 
             var claim = new ClaimEntity
             {
@@ -88,11 +106,13 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                 InsuredName = req.InsuredName,
                 Route = req.Route,
                 Tier = req.Tier,
+                InsuredAge = req.InsuredAge,
                 Type = req.ClaimType,
                 SubmittedAmount = req.SubmittedAmount,
-                CalculatedPayout = CalculatePayout(req.ClaimType, req.SubmittedAmount, req.Tier),
+                CalculatedPayout = calculatedPayout,
                 IncidentDetailsJson = req.IncidentDetailsJson,
                 FileObjectKeys = fileKeys,
+                FileLabels = fileLabels,
                 IsPreValidationFailedDueToOutage = isOutageBypass,
                 Status = ClaimStatus.Pending
             };
@@ -111,13 +131,52 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
             const string chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
             var suffix = new string(Enumerable.Range(0, 4)
                 .Select(_ => chars[Random.Shared.Next(chars.Length)]).ToArray());
-            return $"CLM-{DateTime.UtcNow:yyyyMMdd}-{suffix}";
+            return $"CLM{suffix}";
         }
 
-        private static decimal CalculatePayout(ClaimType claimType, decimal submittedAmount, PolicyTier tier)
+        private static decimal CalculatePayout(
+            ReservationRequest req, double actualDelayHours, IBenefitLimitsService limits)
         {
-            // Placeholder — payout rules to be refined per Etiqa benefit matrix
-            return submittedAmount;
+            if (req.ClaimType == ClaimType.FlightDelay)
+            {
+                var (ratePerBlock, blockSize, maxPayout) = limits.GetFlightDelayRate(req.Route, req.Tier);
+                if (ratePerBlock == 0) return 0;
+                var blocks = Math.Max(1, Math.Floor(actualDelayHours / (double)blockSize));
+                return Math.Min((decimal)blocks * ratePerBlock, maxPayout);
+            }
+
+            if (req.ClaimType == ClaimType.HospitalConfinement)
+            {
+                var (dailyRate, _, maxPayout) = limits.GetConfinementRate(req.Route, req.Tier);
+                int days = ParseIntField(req.IncidentDetailsJson, "numberOfDays");
+                return Math.Min(days * dailyRate, maxPayout);
+            }
+
+            if (req.ClaimType == ClaimType.HijackInconvenience)
+            {
+                var (dailyRate, _, maxPayout) = limits.GetHijackRate(req.Route, req.Tier);
+                int days = ParseIntField(req.IncidentDetailsJson, "durationDays");
+                return Math.Min(days * dailyRate, maxPayout);
+            }
+
+            if (req.ClaimType is ClaimType.BaggageDelay or ClaimType.MissedConnection)
+                return limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge);
+
+            var cap = limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge);
+            return cap > 0 ? Math.Min(req.SubmittedAmount, cap) : req.SubmittedAmount;
+        }
+
+        private static int ParseIntField(string json, string field)
+        {
+            try
+            {
+                var doc = JsonSerializer.Deserialize<JsonElement>(json);
+                return doc.GetProperty(field).GetInt32();
+            }
+            catch
+            {
+                return 0;
+            }
         }
     }
 }
