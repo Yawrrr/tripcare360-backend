@@ -28,4 +28,13 @@ public class MinioStorageService(IMinioClient minioClient) : IMinioStorageServic
 
         return objectKey;
     }
+
+    public async Task<string> GetPresignedUrlAsync(string objectKey, int expirySeconds = 3600)
+    {
+        var args = new PresignedGetObjectArgs()
+            .WithBucket(BucketName)
+            .WithObject(objectKey)
+            .WithExpiry(expirySeconds);
+        return await minioClient.PresignedGetObjectAsync(args);
+    }
 }
