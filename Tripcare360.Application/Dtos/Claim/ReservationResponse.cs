@@ -5,5 +5,6 @@ public record ReservationResponse(
     decimal CalculatedPayout,
     string ValidationMessage,
     DateTimeOffset ExpiresAt,
-    bool IsOutageBypassTransition
+    bool IsOutageBypassTransition,
+    string Currency
 );

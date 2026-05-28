@@ -8,5 +8,7 @@ public record ClaimListItemResponse(
     string Status,
     decimal CalculatedPayout,
     DateTimeOffset CreatedAt,
-    bool IsPreValidationFailedDueToOutage
+    bool IsPreValidationFailedDueToOutage,
+    string Country,
+    string Currency
 );

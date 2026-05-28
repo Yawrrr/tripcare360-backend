@@ -19,5 +19,6 @@ public class ErrorCode
     public static readonly ErrorCode ClaimExpired = new("CLM_004", "Claim reservation expired.", "The 10-minute reservation window has elapsed. Please restart the claim process.");
     public static readonly ErrorCode ClaimAlreadyProcessed = new("CLM_005", "Claim already processed.", "This claim has already been approved or rejected and cannot be updated.");
     public static readonly ErrorCode InvalidAction = new("CLM_006", "Invalid action.", "The specified action is not valid. Use 'Approve' or 'Reject'.");
+    public static readonly ErrorCode InvalidCredentials = new("AUTH_001", "Invalid credentials.", "The username or password is incorrect.");
     public static readonly ErrorCode InternalServerError = new("SYS_001", "Internal Server Error", "The server encountered an internal error. Please try again later.");
 }

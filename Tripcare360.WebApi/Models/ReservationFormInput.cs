@@ -10,6 +10,7 @@ public class ReservationFormInput
     public TravelRoute Route { get; set; }
     public PolicyTier Tier { get; set; }
     public int InsuredAge { get; set; }
+    public Country Country { get; set; }
     public ClaimType ClaimType { get; set; }
     public decimal SubmittedAmount { get; set; }
     public string IncidentDetailsJson { get; set; } = string.Empty;

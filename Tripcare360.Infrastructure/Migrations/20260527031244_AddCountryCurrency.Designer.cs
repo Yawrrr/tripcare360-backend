@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Tripcare360.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using Tripcare360.Infrastructure.Persistence;
 namespace Tripcare360.Infrastructure.Migrations
 {
     [DbContext(typeof(Tripcare360DbContext))]
-    partial class Tripcare360DbContextModelSnapshot : ModelSnapshot
+    [Migration("20260527031244_AddCountryCurrency")]
+    partial class AddCountryCurrency
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -29,9 +32,6 @@ namespace Tripcare360.Infrastructure.Migrations
                         .HasColumnType("uniqueidentifier");
 
                     b.Property<string>("AdminComments")
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("AiExtractionResultJson")
                         .HasColumnType("nvarchar(max)");
 
                     b.Property<decimal>("CalculatedPayout")

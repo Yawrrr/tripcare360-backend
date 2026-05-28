@@ -20,7 +20,7 @@ public class GetBenefitsQuery(GetBenefitsRequest request) : IRequest<List<Benefi
         public Task<List<BenefitItemDto>> Handle(GetBenefitsQuery query, CancellationToken ct)
         {
             var req = query.Request;
-            var items = benefitLimits.GetAllBenefits(req.Route, req.Tier, req.InsuredAge);
+            var items = benefitLimits.GetAllBenefits(req.Country, req.Route, req.Tier, req.InsuredAge);
             return Task.FromResult(items.ToList());
         }
     }

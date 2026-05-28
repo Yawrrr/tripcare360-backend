@@ -17,7 +17,12 @@ public class ExceptionHandlerMiddleware(RequestDelegate next, ILogger<ExceptionH
         catch (ApiException ex)
         {
             var errorCode = ex.ErrorCode;
-            int statusCode = errorCode.Code.StartsWith("SYS") ? 500 : 400;
+            int statusCode = errorCode.Code switch
+            {
+                var c when c.StartsWith("SYS")  => 500,
+                var c when c.StartsWith("AUTH") => 401,
+                _                               => 400,
+            };
 
             await WriteErrorResponse(context, statusCode, new ErrorResponse(
                 Status: "Failed",

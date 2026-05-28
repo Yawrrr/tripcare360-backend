@@ -32,6 +32,8 @@ public class Tripcare360DbContext : DbContext
             entity.Property(c => c.Status).HasConversion<string>();
             entity.Property(c => c.Route).HasConversion<string>();
             entity.Property(c => c.Tier).HasConversion<string>();
+            entity.Property(c => c.Country).HasConversion<string>();
+            entity.Property(c => c.Currency).HasConversion<string>();
             entity.Property(c => c.SubmittedAmount).HasPrecision(18, 2);
             entity.Property(c => c.CalculatedPayout).HasPrecision(18, 2);
 

@@ -36,8 +36,13 @@ public static class DependencyInjection
             .WithSSL(false)
             .Build());
 
+        services.AddHttpClient("AiProcessor");
+
         services.AddScoped<IMinioStorageService, MinioStorageService>();
+        services.AddScoped<IDocumentTextExtractor, DocumentTextExtractor>();
         services.AddScoped<IClaimRepository, ClaimRepository>();
+        services.AddSingleton<ITokenService, TokenService>();
+        services.AddSingleton<IAdminCredentials, AdminCredentials>();
         services.AddHostedService<ClaimExpiryService>();
 
         return services;

@@ -9,7 +9,9 @@ public record VerifyPolicyResponse(
     int InsuredAge,
     TravelRoute Route,
     PolicyTier Tier,
+    Country Country,
     DateTime StartDate,
     DateTime EndDate,
-    List<string> EligibleClaimTypes
+    List<string> EligibleClaimTypes,
+    bool HasCovid19Coverage
 );

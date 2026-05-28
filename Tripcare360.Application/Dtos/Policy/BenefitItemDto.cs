@@ -5,5 +5,6 @@ public record BenefitItemDto(
     string ClaimType,
     string DisplayName,
     decimal MaxPayout,
-    string Notes
+    string Notes,
+    string Currency
 );

@@ -30,6 +30,7 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
             input.Route,
             input.Tier,
             input.InsuredAge,
+            input.Country,
             input.ClaimType,
             input.SubmittedAmount,
             input.IncidentDetailsJson,

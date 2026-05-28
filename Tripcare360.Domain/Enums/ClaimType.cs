@@ -54,5 +54,14 @@ public enum ClaimType
     EmergencyEvacuation,
 
     [ClaimCategory(ClaimCategory.EmergencyServices)]
-    RepatriationOfRemains
+    RepatriationOfRemains,
+
+    [ClaimCategory(ClaimCategory.OptionalBenefits)]
+    AdventurousActivities,
+
+    [ClaimCategory(ClaimCategory.OptionalBenefits)]
+    GolfCover,
+
+    [ClaimCategory(ClaimCategory.OptionalBenefits)]
+    ExtendedHomeCare
 }

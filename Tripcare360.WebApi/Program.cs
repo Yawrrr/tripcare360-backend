@@ -10,13 +10,15 @@ builder.Configuration.AddJsonFile("appsettings.Local.json", optional: true, relo
 builder.Services
     .AddApplicationServices()
     .AddInfrastructureServices(builder.Configuration)
-    .AddWebApiServices();
+    .AddWebApiServices(builder.Configuration);
 
 var app = builder.Build();
 
 app.UseMiddleware<ExceptionHandlerMiddleware>();
 app.UseMiddleware<ResponseWrapperMiddleware>();
 app.UseCors("AllowNextJs");
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseWhen(ctx => ctx.Request.Path.Value?.Contains("/sse/") != true,
     branch => branch.UseHttpsRedirection());
 app.MapControllers();

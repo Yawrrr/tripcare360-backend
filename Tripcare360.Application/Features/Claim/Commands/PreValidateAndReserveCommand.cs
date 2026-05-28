@@ -6,6 +6,7 @@ using Tripcare360.Application.Interfaces.Repositories;
 using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.Application.Mappers;
 using System.Text.Json;
+using Tripcare360.Domain.Common;
 using Tripcare360.Domain.Entities.Claim;
 using Tripcare360.Domain.Entities.Errors;
 using Tripcare360.Domain.Enums;
@@ -33,6 +34,8 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
         ITravelStatusRegistryClient flightRegistry,
         IMinioStorageService minioStorage,
         IBenefitLimitsService benefitLimits,
+        IEtiqaBackendClient etiqaClient,
+        IDocumentTextExtractor textExtractor,
         ILogger<Handler> logger)
         : IRequestHandler<PreValidateAndReserveCommand, ReservationResponse>
     {
@@ -82,21 +85,56 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                 }
             }
 
+            // ── Read file bytes first so we can both extract text and upload ────
+            var fileData = new List<(ClaimFileUpload File, byte[] Bytes)>();
+            foreach (var file in req.SupportingFiles)
+            {
+                var bytes = new byte[file.Length];
+                _ = await file.Content.ReadAsync(bytes, cancellationToken);
+                fileData.Add((file, bytes));
+            }
+
+            // ── Build AI document payloads ────────────────────────────────────
+            var docPayloads = new List<DocumentPayload>();
+            foreach (var (file, bytes) in fileData)
+            {
+                var isPdf = file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)
+                            || file.ContentType.Equals("application/pdf", StringComparison.OrdinalIgnoreCase);
+
+                string text = string.Empty;
+                if (isPdf)
+                {
+                    using var pdfStream = new MemoryStream(bytes);
+                    text = textExtractor.ExtractText(pdfStream);
+                }
+
+                byte[]? imageBytes = string.IsNullOrWhiteSpace(text) ? bytes : null;
+                docPayloads.Add(new DocumentPayload(text, imageBytes, file.FileName, file.ContentType));
+            }
+
+            // ── Upload files to MinIO ─────────────────────────────────────────
             var claimCode = GenerateClaimCode();
             var fileKeys = new List<string>();
             var fileLabels = new List<string>();
 
-            foreach (var file in req.SupportingFiles)
+            foreach (var (file, bytes) in fileData)
             {
-                fileKeys.Add(await minioStorage.UploadFileAsync(claimCode, file));
+                using var uploadStream = new MemoryStream(bytes);
+                var uploadFile = file with { Content = uploadStream, Length = bytes.Length };
+                fileKeys.Add(await minioStorage.UploadFileAsync(claimCode, uploadFile));
                 fileLabels.Add(file.Label);
             }
+
+            // ── AI document processing (non-blocking — failure never rejects claim) ──
+            string? aiResult = null;
+            if (docPayloads.Count > 0)
+                aiResult = await etiqaClient.ProcessClaimDocumentsAsync(req.ClaimType.ToString(), docPayloads);
 
             var calculatedPayout = CalculatePayout(req, actualDelayHours, benefitLimits);
 
             logger.LogInformation(
-                "[PreValidate] claimType={ClaimType} route={Route} tier={Tier} insuredAge={InsuredAge} actualDelayHours={ActualDelayHours} isOutageBypass={IsOutageBypass} calculatedPayout={CalculatedPayout}",
-                req.ClaimType, req.Route, req.Tier, req.InsuredAge, actualDelayHours, isOutageBypass, calculatedPayout);
+                "[PreValidate] claimType={ClaimType} route={Route} tier={Tier} insuredAge={InsuredAge} actualDelayHours={ActualDelayHours} isOutageBypass={IsOutageBypass} calculatedPayout={CalculatedPayout} aiProcessed={AiProcessed}",
+                req.ClaimType, req.Route, req.Tier, req.InsuredAge, actualDelayHours, isOutageBypass, calculatedPayout, aiResult is not null);
 
             var claim = new ClaimEntity
             {
@@ -107,6 +145,8 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                 Route = req.Route,
                 Tier = req.Tier,
                 InsuredAge = req.InsuredAge,
+                Country = req.Country,
+                Currency = CountryCurrencyMap.GetCurrency(req.Country),
                 Type = req.ClaimType,
                 SubmittedAmount = req.SubmittedAmount,
                 CalculatedPayout = calculatedPayout,
@@ -114,6 +154,7 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                 FileObjectKeys = fileKeys,
                 FileLabels = fileLabels,
                 IsPreValidationFailedDueToOutage = isOutageBypass,
+                AiExtractionResultJson = aiResult,
                 Status = ClaimStatus.Pending
             };
 
@@ -139,7 +180,7 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
         {
             if (req.ClaimType == ClaimType.FlightDelay)
             {
-                var (ratePerBlock, blockSize, maxPayout) = limits.GetFlightDelayRate(req.Route, req.Tier);
+                var (ratePerBlock, blockSize, maxPayout) = limits.GetFlightDelayRate(req.Country, req.Route, req.Tier);
                 if (ratePerBlock == 0) return 0;
                 var blocks = Math.Max(1, Math.Floor(actualDelayHours / (double)blockSize));
                 return Math.Min((decimal)blocks * ratePerBlock, maxPayout);
@@ -147,22 +188,22 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
 
             if (req.ClaimType == ClaimType.HospitalConfinement)
             {
-                var (dailyRate, _, maxPayout) = limits.GetConfinementRate(req.Route, req.Tier);
+                var (dailyRate, _, maxPayout) = limits.GetConfinementRate(req.Country, req.Route, req.Tier);
                 int days = ParseIntField(req.IncidentDetailsJson, "numberOfDays");
                 return Math.Min(days * dailyRate, maxPayout);
             }
 
             if (req.ClaimType == ClaimType.HijackInconvenience)
             {
-                var (dailyRate, _, maxPayout) = limits.GetHijackRate(req.Route, req.Tier);
+                var (dailyRate, _, maxPayout) = limits.GetHijackRate(req.Country, req.Route, req.Tier);
                 int days = ParseIntField(req.IncidentDetailsJson, "durationDays");
                 return Math.Min(days * dailyRate, maxPayout);
             }
 
             if (req.ClaimType is ClaimType.BaggageDelay or ClaimType.MissedConnection)
-                return limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge);
+                return limits.GetMaxPayout(req.Country, req.Route, req.Tier, req.ClaimType, req.InsuredAge);
 
-            var cap = limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge);
+            var cap = limits.GetMaxPayout(req.Country, req.Route, req.Tier, req.ClaimType, req.InsuredAge);
             return cap > 0 ? Math.Min(req.SubmittedAmount, cap) : req.SubmittedAmount;
         }
 

@@ -7,5 +7,6 @@ public enum ClaimCategory
     TravelInconveniences,
     PersonalBelongings,
     Liability,
-    EmergencyServices
+    EmergencyServices,
+    OptionalBenefits
 }

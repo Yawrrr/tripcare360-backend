@@ -1,4 +1,5 @@
 using MediatR;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Tripcare360.Application.Dtos.Admin;
 using Tripcare360.Application.Features.Claim.Commands;
@@ -9,6 +10,7 @@ namespace Tripcare360.WebApi.Controllers;
 
 [ApiController]
 [Route("api/admin")]
+[Authorize]
 public class AdminController(ISender sender) : ControllerBase
 {
     [HttpGet("claims")]

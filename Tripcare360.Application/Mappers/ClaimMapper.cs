@@ -13,14 +13,15 @@ public static class ClaimMapper
             claim.CalculatedPayout,
             message,
             claim.CreatedAt.AddMinutes(10),
-            isOutageBypass
+            isOutageBypass,
+            claim.Currency.ToString()
         );
 
     public static FinalizeClaimResponse ToFinalizeResponse(this ClaimEntity claim) =>
         new(claim.ClaimCode, claim.Status, "Claim submitted successfully.");
 
     public static ClaimStatusResponse ToStatusResponse(this ClaimEntity claim) =>
-        new(claim.ClaimCode, claim.Status.ToString(), claim.CalculatedPayout);
+        new(claim.ClaimCode, claim.Status.ToString(), claim.CalculatedPayout, claim.Currency.ToString());
 
     public static ClaimListItemResponse ToListItemResponse(this ClaimEntity claim) =>
         new(
@@ -31,7 +32,9 @@ public static class ClaimMapper
             claim.Status.ToString(),
             claim.CalculatedPayout,
             claim.CreatedAt,
-            claim.IsPreValidationFailedDueToOutage
+            claim.IsPreValidationFailedDueToOutage,
+            claim.Country.ToString(),
+            claim.Currency.ToString()
         );
 
     public static ClaimDetailResponse ToDetailResponse(
@@ -53,7 +56,9 @@ public static class ClaimMapper
             claim.AdminComments,
             claim.ProcessedAt,
             claim.CreatedAt,
-            files
+            files,
+            claim.Country.ToString(),
+            claim.Currency.ToString()
         );
 
     public static UpdateClaimStatusResponse ToUpdateStatusResponse(this ClaimEntity claim) =>
