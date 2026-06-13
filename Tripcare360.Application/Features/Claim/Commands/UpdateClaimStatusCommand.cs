@@ -48,7 +48,7 @@ public class UpdateClaimStatusCommand(string claimCode, UpdateClaimStatusRequest
                 : ClaimStatus.Rejected;
 
             claim.AdminComments = command.Request.AdminComments;
-            claim.ProcessedAt = DateTime.UtcNow;
+            claim.ProcessedAt = DateTimeOffset.UtcNow;
 
             await repo.UpdateAsync(claim);
 

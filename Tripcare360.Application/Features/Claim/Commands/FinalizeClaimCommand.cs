@@ -41,7 +41,7 @@ public class FinalizeClaimCommand(FinalizeClaimRequest request) : IRequest<Final
                 throw new ApiException(ErrorCode.ClaimExpired);
 
             claim.Status = ClaimStatus.Submitted;
-            claim.ProcessedAt = DateTime.UtcNow;
+            claim.ProcessedAt = DateTimeOffset.UtcNow;
 
             await claimRepository.UpdateAsync(claim);
 

@@ -15,7 +15,7 @@ public record ClaimDetailResponse(
     string Status,
     bool IsPreValidationFailedDueToOutage,
     string? AdminComments,
-    DateTime? ProcessedAt,
+    DateTimeOffset? ProcessedAt,
     DateTimeOffset CreatedAt,
     IReadOnlyList<FileDetailItem> Files
 );

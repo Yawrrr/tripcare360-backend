@@ -22,5 +22,5 @@ public class ClaimEntity : BaseEntity
     public bool IsPreValidationFailedDueToOutage { get; set; } = false;
     public string? AdminComments { get; set; }
     public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
-    public DateTime? ProcessedAt { get; set; }
+    public DateTimeOffset? ProcessedAt { get; set; }
 }
