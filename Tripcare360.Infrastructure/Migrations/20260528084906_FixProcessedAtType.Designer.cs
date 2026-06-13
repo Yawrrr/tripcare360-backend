@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Tripcare360.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using Tripcare360.Infrastructure.Persistence;
 namespace Tripcare360.Infrastructure.Migrations
 {
     [DbContext(typeof(Tripcare360DbContext))]
-    partial class Tripcare360DbContextModelSnapshot : ModelSnapshot
+    [Migration("20260528084906_FixProcessedAtType")]
+    partial class FixProcessedAtType
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -31,9 +34,6 @@ namespace Tripcare360.Infrastructure.Migrations
                     b.Property<string>("AdminComments")
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("AiExtractionResultJson")
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<decimal>("CalculatedPayout")
                         .HasPrecision(18, 2)
                         .HasColumnType("decimal(18,2)");
@@ -42,16 +42,8 @@ namespace Tripcare360.Infrastructure.Migrations
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 
-                    b.Property<string>("Country")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
                     b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
-
-                    b.Property<string>("Currency")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
 
                     b.PrimitiveCollection<string>("FileLabels")
                         .IsRequired()
