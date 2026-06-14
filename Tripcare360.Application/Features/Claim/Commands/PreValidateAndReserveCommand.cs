@@ -1,12 +1,13 @@
 using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
 using Tripcare360.Application.Dtos.Claim;
 using Tripcare360.Application.Features.Flight;
 using Tripcare360.Application.Interfaces.Repositories;
 using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.Application.Mappers;
-using System.Text.Json;
 using Tripcare360.Domain.Entities.Claim;
 using Tripcare360.Domain.Entities.Errors;
 using Tripcare360.Domain.Enums;
@@ -26,6 +27,7 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
             RuleFor(c => c.Request.InsuredName).NotEmpty();
             RuleFor(c => c.Request.IncidentDetailsJson).NotEmpty();
             RuleFor(c => c.Request.SubmittedAmount).GreaterThanOrEqualTo(0);
+            RuleFor(c => c.Request.Country).NotEmpty();
         }
     }
 
@@ -61,37 +63,31 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                     var booking = await flightRegistry.GetBookingAsync(flightNumber, bookingNumber);
 
                     if (booking is null)
-                        throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                            details: $"No boarding record found for flight {flightNumber} and booking {bookingNumber}.");
+                        throw new ApiException(ErrorCode.BookingNotFound);
 
                     if (!string.Equals(booking.IdentityNumber, req.IdentityNumber, StringComparison.OrdinalIgnoreCase))
-                        throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                            details: "This booking belongs to a different traveller than the verified policyholder.");
+                        throw new ApiException(ErrorCode.TravellerMismatch);
 
                     // Flight status needed for: route validation (both types) + delay threshold (FlightDelay only).
                     var flightStatus = await flightRegistry.GetFlightStatusAsync(flightNumber);
 
                     if (flightStatus is null)
-                        throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                            details: $"Flight {flightNumber} record not found.");
+                        throw new ApiException(ErrorCode.FlightNotFound);
 
                     if (!ClaimThresholds.IsFlightRouteMatch(flightStatus.DepartureCountry, flightStatus.ArrivalCountry, req.Route))
-                        throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                            details: $"Flight {flightNumber} route does not match your {req.Route} policy coverage.");
+                        throw new ApiException(ErrorCode.FlightRouteMismatch);
 
                     if (req.ClaimType == ClaimType.FlightDelay)
                     {
                         if (!(flightStatus.IsDelayed && flightStatus.ActualDelayHours >= ClaimThresholds.FlightDelayMinHours))
-                            throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                                details: $"Flight {flightNumber} operated on schedule or delay does not meet the minimum threshold.");
+                            throw new ApiException(ErrorCode.FlightDelayThresholdNotMet);
 
                         actualDelayHours = flightStatus.ActualDelayHours;
                     }
                     else // BaggageDelay
                     {
                         if (!(booking.IsBaggageDelayed && booking.BaggageDelayHours >= ClaimThresholds.BaggageDelayMinHours))
-                            throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                                details: $"Baggage for flight {flightNumber} was not delayed beyond the minimum threshold.");
+                            throw new ApiException(ErrorCode.BaggageDelayThresholdNotMet);
 
                         actualDelayHours = booking.BaggageDelayHours;
                     }
@@ -112,11 +108,17 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
 
             foreach (var file in req.SupportingFiles)
             {
+                if (await IsPdfEncryptedAsync(file, cancellationToken))
+                    throw new ApiException(ErrorCode.PdfEncrypted);
+            }
+
+            foreach (var file in req.SupportingFiles)
+            {
                 fileKeys.Add(await minioStorage.UploadFileAsync(claimCode, file));
                 fileLabels.Add(file.Label);
             }
 
-            var calculatedPayout = CalculatePayout(req, actualDelayHours, benefitLimits);
+            var calculatedPayout = CalculatePayout(req, actualDelayHours, benefitLimits, req.Country);
 
             logger.LogInformation(
                 "[PreValidate] claimType={ClaimType} route={Route} tier={Tier} insuredAge={InsuredAge} actualDelayHours={ActualDelayHours} isOutageBypass={IsOutageBypass} calculatedPayout={CalculatedPayout}",
@@ -137,6 +139,7 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                 IncidentDetailsJson = req.IncidentDetailsJson,
                 FileObjectKeys = fileKeys,
                 FileLabels = fileLabels,
+                Country = req.Country,
                 IsPreValidationFailedDueToOutage = isOutageBypass,
                 Status = ClaimStatus.Pending
             };
@@ -159,11 +162,11 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
         }
 
         private static decimal CalculatePayout(
-            ReservationRequest req, double actualDelayHours, IBenefitLimitsService limits)
+            ReservationRequest req, double actualDelayHours, IBenefitLimitsService limits, string country)
         {
             if (req.ClaimType == ClaimType.FlightDelay)
             {
-                var (ratePerBlock, blockSize, maxPayout) = limits.GetFlightDelayRate(req.Route, req.Tier);
+                var (ratePerBlock, blockSize, maxPayout) = limits.GetFlightDelayRate(req.Route, req.Tier, country);
                 if (ratePerBlock == 0) return 0;
                 var blocks = Math.Max(1, Math.Floor(actualDelayHours / (double)blockSize));
                 return Math.Min((decimal)blocks * ratePerBlock, maxPayout);
@@ -171,22 +174,22 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
 
             if (req.ClaimType == ClaimType.HospitalConfinement)
             {
-                var (dailyRate, _, maxPayout) = limits.GetConfinementRate(req.Route, req.Tier);
+                var (dailyRate, _, maxPayout) = limits.GetConfinementRate(req.Route, req.Tier, country);
                 int days = ParseIntField(req.IncidentDetailsJson, "numberOfDays");
                 return Math.Min(days * dailyRate, maxPayout);
             }
 
             if (req.ClaimType == ClaimType.HijackInconvenience)
             {
-                var (dailyRate, _, maxPayout) = limits.GetHijackRate(req.Route, req.Tier);
+                var (dailyRate, _, maxPayout) = limits.GetHijackRate(req.Route, req.Tier, country);
                 int days = ParseIntField(req.IncidentDetailsJson, "durationDays");
                 return Math.Min(days * dailyRate, maxPayout);
             }
 
             if (req.ClaimType is ClaimType.BaggageDelay or ClaimType.MissedConnection)
-                return limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge);
+                return limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge, country);
 
-            var cap = limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge);
+            var cap = limits.GetMaxPayout(req.Route, req.Tier, req.ClaimType, req.InsuredAge, country);
             return cap > 0 ? Math.Min(req.SubmittedAmount, cap) : req.SubmittedAmount;
         }
 
@@ -201,6 +204,17 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
             {
                 return 0;
             }
+        }
+
+        private static async Task<bool> IsPdfEncryptedAsync(ClaimFileUpload file, CancellationToken ct)
+        {
+            if (!file.FileName.EndsWith(".pdf", StringComparison.OrdinalIgnoreCase)) return false;
+            // /Encrypt lives in the PDF trailer dictionary near the END of the file.
+            // Reading only the header misses it, so we read the full content.
+            using var reader = new StreamReader(file.Content, Encoding.Latin1, leaveOpen: true);
+            var content = await reader.ReadToEndAsync(ct);
+            if (file.Content.CanSeek) file.Content.Seek(0, SeekOrigin.Begin);
+            return content.Contains("/Encrypt");
         }
     }
 }

@@ -35,7 +35,8 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
             input.ClaimType,
             input.SubmittedAmount,
             input.IncidentDetailsJson,
-            files);
+            files,
+            input.Country);
 
         return await sender.Send(new PreValidateAndReserveCommand(request), ct);
     }

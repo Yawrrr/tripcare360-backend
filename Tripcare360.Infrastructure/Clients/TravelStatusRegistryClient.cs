@@ -42,7 +42,7 @@ public class TravelStatusRegistryClient(HttpClient httpClient, ILogger<TravelSta
         if (!response.IsSuccessStatusCode)
         {
             logger.LogError("[FlightRegistry] {StatusCode} — error response for {FlightNumber}", (int)response.StatusCode, flightNumber);
-            throw new ApiException(ErrorCode.AutomatedCheckFailed,
+            throw new ApiException(ErrorCode.VerificationServiceError,
                 details: $"Flight status registry returned {(int)response.StatusCode} for flight {flightNumber}.");
         }
 
@@ -82,7 +82,7 @@ public class TravelStatusRegistryClient(HttpClient httpClient, ILogger<TravelSta
         {
             logger.LogError("[FlightRegistry] {StatusCode} — error response for {FlightNumber}/{BookingNumber}",
                 (int)response.StatusCode, flightNumber, bookingNumber);
-            throw new ApiException(ErrorCode.AutomatedCheckFailed,
+            throw new ApiException(ErrorCode.VerificationServiceError,
                 details: $"Flight status registry returned {(int)response.StatusCode} for booking {bookingNumber}.");
         }
 

@@ -36,13 +36,13 @@ public class RunManualValidationQuery(string claimCode) : IRequest<ManualValidat
 
             var flight = await flightRegistry.GetFlightStatusAsync(flightNumber);
             if (flight is null)
-                throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                    details: $"Flight {flightNumber} not found in the registry.");
+                throw new ApiException(ErrorCode.FlightNotFound,
+                    details: $"Flight {flightNumber} was not found in the registry.");
 
             var booking = await flightRegistry.GetBookingAsync(flightNumber, bookingNumber);
             if (booking is null)
-                throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                    details: $"No boarding record found for flight {flightNumber} and booking {bookingNumber}.");
+                throw new ApiException(ErrorCode.BookingNotFound,
+                    details: $"No boarding record found for flight {flightNumber} with booking reference {bookingNumber}.");
 
             bool isRouteMatch = ClaimThresholds.IsFlightRouteMatch(
                 flight.DepartureCountry, flight.ArrivalCountry, claim.Route);
