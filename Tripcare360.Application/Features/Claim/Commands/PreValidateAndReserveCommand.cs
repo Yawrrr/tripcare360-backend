@@ -2,6 +2,7 @@ using FluentValidation;
 using MediatR;
 using Microsoft.Extensions.Logging;
 using Tripcare360.Application.Dtos.Claim;
+using Tripcare360.Application.Features.Flight;
 using Tripcare360.Application.Interfaces.Repositories;
 using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.Application.Mappers;
@@ -50,27 +51,50 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
             {
                 var incident = JsonSerializer.Deserialize<JsonElement>(req.IncidentDetailsJson);
                 string flightNumber = incident.GetProperty("flightNumber").GetString() ?? string.Empty;
-                DateTime departureDate = incident.GetProperty("departureDate").GetDateTime();
+                string bookingNumber = incident.TryGetProperty("bookingNumber", out var bk)
+                    ? bk.GetString() ?? string.Empty
+                    : string.Empty;
 
                 try
                 {
-                    var flightStatus = await flightRegistry.GetFlightStatusAsync(flightNumber, departureDate);
+                    // Booking lookup = proof the passenger boarded + the owning identity.
+                    var booking = await flightRegistry.GetBookingAsync(flightNumber, bookingNumber);
+
+                    if (booking is null)
+                        throw new ApiException(ErrorCode.AutomatedCheckFailed,
+                            details: $"No boarding record found for flight {flightNumber} and booking {bookingNumber}.");
+
+                    if (!string.Equals(booking.IdentityNumber, req.IdentityNumber, StringComparison.OrdinalIgnoreCase))
+                        throw new ApiException(ErrorCode.AutomatedCheckFailed,
+                            details: "This booking belongs to a different traveller than the verified policyholder.");
+
+                    // Flight status needed for: route validation (both types) + delay threshold (FlightDelay only).
+                    var flightStatus = await flightRegistry.GetFlightStatusAsync(flightNumber);
 
                     if (flightStatus is null)
                         throw new ApiException(ErrorCode.AutomatedCheckFailed,
                             details: $"Flight {flightNumber} record not found.");
 
-                    bool meetsThreshold = req.ClaimType == ClaimType.FlightDelay
-                        ? flightStatus.ActualDelayHours >= 2
-                        : flightStatus.BaggageDelayHours >= 6;
-
-                    if (!meetsThreshold)
+                    if (!ClaimThresholds.IsFlightRouteMatch(flightStatus.DepartureCountry, flightStatus.ArrivalCountry, req.Route))
                         throw new ApiException(ErrorCode.AutomatedCheckFailed,
-                            details: $"Flight {flightNumber} operated on schedule or delay does not meet the minimum threshold.");
+                            details: $"Flight {flightNumber} route does not match your {req.Route} policy coverage.");
 
-                    actualDelayHours = req.ClaimType == ClaimType.FlightDelay
-                        ? flightStatus.ActualDelayHours
-                        : flightStatus.BaggageDelayHours;
+                    if (req.ClaimType == ClaimType.FlightDelay)
+                    {
+                        if (!(flightStatus.IsDelayed && flightStatus.ActualDelayHours >= ClaimThresholds.FlightDelayMinHours))
+                            throw new ApiException(ErrorCode.AutomatedCheckFailed,
+                                details: $"Flight {flightNumber} operated on schedule or delay does not meet the minimum threshold.");
+
+                        actualDelayHours = flightStatus.ActualDelayHours;
+                    }
+                    else // BaggageDelay
+                    {
+                        if (!(booking.IsBaggageDelayed && booking.BaggageDelayHours >= ClaimThresholds.BaggageDelayMinHours))
+                            throw new ApiException(ErrorCode.AutomatedCheckFailed,
+                                details: $"Baggage for flight {flightNumber} was not delayed beyond the minimum threshold.");
+
+                        actualDelayHours = booking.BaggageDelayHours;
+                    }
                 }
                 catch (ApiException)
                 {
