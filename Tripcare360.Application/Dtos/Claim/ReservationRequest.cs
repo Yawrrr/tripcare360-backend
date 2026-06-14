@@ -12,5 +12,6 @@ public record ReservationRequest(
     ClaimType ClaimType,
     decimal SubmittedAmount,
     string IncidentDetailsJson,
-    List<ClaimFileUpload> SupportingFiles
+    List<ClaimFileUpload> SupportingFiles,
+    string Country
 );

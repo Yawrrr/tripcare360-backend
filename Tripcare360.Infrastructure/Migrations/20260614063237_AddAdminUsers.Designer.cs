@@ -3,6 +3,7 @@ using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Tripcare360.Infrastructure.Persistence;
 
@@ -11,9 +12,11 @@ using Tripcare360.Infrastructure.Persistence;
 namespace Tripcare360.Infrastructure.Migrations
 {
     [DbContext(typeof(Tripcare360DbContext))]
-    partial class Tripcare360DbContextModelSnapshot : ModelSnapshot
+    [Migration("20260614063237_AddAdminUsers")]
+    partial class AddAdminUsers
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -71,10 +74,6 @@ namespace Tripcare360.Infrastructure.Migrations
                         .HasColumnType("decimal(18,2)");
 
                     b.Property<string>("ClaimCode")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<string>("Country")
                         .IsRequired()
                         .HasColumnType("nvarchar(max)");
 

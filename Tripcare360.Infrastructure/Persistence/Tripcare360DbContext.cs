@@ -1,5 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.ChangeTracking;
+using Tripcare360.Domain.Entities.Admin;
 using Tripcare360.Domain.Entities.Claim;
 using Tripcare360.Domain.Entities.Common;
 
@@ -21,6 +22,7 @@ public class Tripcare360DbContext : DbContext
     }
 
     public DbSet<ClaimEntity> Claims => Set<ClaimEntity>();
+    public DbSet<AdminUserEntity> AdminUsers => Set<AdminUserEntity>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -46,6 +48,11 @@ public class Tripcare360DbContext : DbContext
                     (a, b) => a != null && b != null && a.SequenceEqual(b),
                     v => v.Aggregate(0, (h, s) => HashCode.Combine(h, s.GetHashCode())),
                     v => v.ToList()));
+        });
+
+        modelBuilder.Entity<AdminUserEntity>(entity =>
+        {
+            entity.HasIndex(u => u.Email).IsUnique();
         });
     }
 }

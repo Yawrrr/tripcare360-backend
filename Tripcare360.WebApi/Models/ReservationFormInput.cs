@@ -15,4 +15,5 @@ public class ReservationFormInput
     public string IncidentDetailsJson { get; set; } = string.Empty;
     public List<IFormFile>? SupportingFiles { get; set; }
     public List<string>? SupportingFileLabels { get; set; }
+    public string Country { get; set; } = string.Empty;
 }

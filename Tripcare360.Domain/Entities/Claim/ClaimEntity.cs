@@ -19,6 +19,7 @@ public class ClaimEntity : BaseEntity
     public required string IncidentDetailsJson { get; set; }
     public List<string> FileObjectKeys { get; set; } = [];
     public List<string> FileLabels { get; set; } = [];
+    public required string Country { get; set; }
     public bool IsPreValidationFailedDueToOutage { get; set; } = false;
     public string? AdminComments { get; set; }
     public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
