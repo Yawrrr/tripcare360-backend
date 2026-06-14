@@ -1,3 +1,4 @@
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.Infrastructure.Services;
@@ -8,7 +9,9 @@ public static class DependencyInjection
 {
     public static IServiceCollection AddWebApiServices(this IServiceCollection services)
     {
-        services.AddControllers();
+        services.AddControllers()
+            .AddJsonOptions(o =>
+                o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         services.AddEndpointsApiExplorer();
         services.AddCors(o => o.AddPolicy("AllowNextJs", p =>
             p.WithOrigins("http://localhost:3002")

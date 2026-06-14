@@ -21,6 +21,11 @@ public class AdminController(ISender sender) : ControllerBase
         string claimCode, CancellationToken ct)
         => Ok(await sender.Send(new GetAdminClaimDetailQuery(claimCode), ct));
 
+    [HttpPost("claims/{claimCode}/validate")]
+    public async Task<IActionResult> RunManualValidation(
+        string claimCode, CancellationToken ct)
+        => Ok(await sender.Send(new RunManualValidationQuery(claimCode), ct));
+
     [HttpPost("claims/{claimCode}/action")]
     public async Task<IActionResult> UpdateClaimStatus(
         string claimCode, [FromBody] UpdateClaimStatusRequest req, CancellationToken ct)

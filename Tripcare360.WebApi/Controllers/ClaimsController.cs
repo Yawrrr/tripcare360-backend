@@ -1,8 +1,10 @@
 using MediatR;
 using Microsoft.AspNetCore.Mvc;
 using Tripcare360.Application.Dtos.Claim;
+using Tripcare360.Application.Dtos.Flight;
 using Tripcare360.Application.Features.Claim.Commands;
 using Tripcare360.Application.Features.Claim.Queries;
+using Tripcare360.Application.Features.Flight.Queries;
 using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.WebApi.Models;
 
@@ -37,6 +39,11 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
 
         return await sender.Send(new PreValidateAndReserveCommand(request), ct);
     }
+
+    [HttpPost("verify-flight")]
+    public async Task<VerifyFlightResponse> VerifyFlight(
+        [FromBody] VerifyFlightRequest request, CancellationToken ct)
+        => await sender.Send(new VerifyFlightQuery(request.FlightNumber, request.Route), ct);
 
     [HttpPost]
     public async Task<FinalizeClaimResponse> Finalize(
