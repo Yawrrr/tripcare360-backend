@@ -2,10 +2,13 @@ namespace Tripcare360.Application.Dtos.Flight;
 
 public record FlightStatusResponse(
     string FlightNumber,
-    DateTime DepartureDate,
     string AirlineName,
+    string? DepartureDate,
+    string? DepartureAirport,
+    string? DepartureCountry,
+    string? ArrivalDate,
+    string? ArrivalAirport,
+    string? ArrivalCountry,
     bool IsDelayed,
-    double ActualDelayHours,
-    bool IsBaggageDelayed,
-    double BaggageDelayHours
+    double ActualDelayHours
 );

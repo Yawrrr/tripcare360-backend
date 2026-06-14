@@ -20,7 +20,19 @@ public static class ClaimMapper
         new(claim.ClaimCode, claim.Status, "Claim submitted successfully.");
 
     public static ClaimStatusResponse ToStatusResponse(this ClaimEntity claim) =>
-        new(claim.ClaimCode, claim.Status.ToString(), claim.CalculatedPayout);
+        new(
+            claim.ClaimCode,
+            claim.Status.ToString(),
+            claim.CalculatedPayout,
+            claim.InsuredName,
+            claim.PolicyNumber,
+            claim.IdentityNumber,
+            claim.Type.ToString(),
+            claim.Route.ToString(),
+            claim.SubmittedAmount,
+            claim.CreatedAt,
+            claim.ProcessedAt,
+            claim.AdminComments);
 
     public static ClaimListItemResponse ToListItemResponse(this ClaimEntity claim) =>
         new(
