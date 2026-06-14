@@ -19,5 +19,7 @@ public class ErrorCode
     public static readonly ErrorCode ClaimExpired = new("CLM_004", "Claim reservation expired.", "The 10-minute reservation window has elapsed. Please restart the claim process.");
     public static readonly ErrorCode ClaimAlreadyProcessed = new("CLM_005", "Claim already processed.", "This claim has already been approved or rejected and cannot be updated.");
     public static readonly ErrorCode InvalidAction = new("CLM_006", "Invalid action.", "The specified action is not valid. Use 'Approve' or 'Reject'.");
+    public static readonly ErrorCode ExternalServiceOutage = new("CLM_007", "Verification service unavailable.", "The external flight verification service is temporarily unavailable. Please attach a supporting document and proceed for manual review.");
+    public static readonly ErrorCode FlightNotFound = new("CLM_008", "Flight not found.", "No flight record matches the provided flight number.");
     public static readonly ErrorCode InternalServerError = new("SYS_001", "Internal Server Error", "The server encountered an internal error. Please try again later.");
 }
