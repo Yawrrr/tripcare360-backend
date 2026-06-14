@@ -20,7 +20,8 @@ public class PolicyController(ISender sender) : ControllerBase
     public async Task<List<BenefitItemDto>> GetBenefits(
         [FromQuery] TravelRoute route,
         [FromQuery] PolicyTier tier,
+        [FromQuery] string country,
         [FromQuery] int insuredAge = 0,
         CancellationToken ct = default)
-        => await sender.Send(new GetBenefitsQuery(new GetBenefitsRequest(route, tier, insuredAge)), ct);
+        => await sender.Send(new GetBenefitsQuery(new GetBenefitsRequest(route, tier, insuredAge, country)), ct);
 }
