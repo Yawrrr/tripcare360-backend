@@ -8,6 +8,7 @@ using Tripcare360.Infrastructure.Clients;
 using Tripcare360.Infrastructure.Persistence;
 using Tripcare360.Infrastructure.Repositories;
 using Tripcare360.Infrastructure.Services;
+using IPasswordHasher = Tripcare360.Application.Interfaces.Services.IPasswordHasher;
 
 namespace Tripcare360.Infrastructure;
 
@@ -38,6 +39,10 @@ public static class DependencyInjection
 
         services.AddScoped<IMinioStorageService, MinioStorageService>();
         services.AddScoped<IClaimRepository, ClaimRepository>();
+        services.AddScoped<IAdminUserRepository, AdminUserRepository>();
+        services.AddSingleton<IPasswordHasher, PasswordHasherService>();
+        services.AddScoped<IJwtTokenService, JwtTokenService>();
+        services.AddScoped<DbSeeder>();
         services.AddHostedService<ClaimExpiryService>();
 
         return services;
