@@ -28,7 +28,8 @@ public class UpdateClaimStatusCommand(string claimCode, UpdateClaimStatusRequest
 
     public class Handler(
         IClaimRepository repo,
-        ISseEventBroadcaster sseBroadcaster)
+        ISseEventBroadcaster sseBroadcaster,
+        IEmailNotificationService emailService)
         : IRequestHandler<UpdateClaimStatusCommand, UpdateClaimStatusResponse>
     {
         private static readonly HashSet<ClaimStatus> TerminalStatuses =
@@ -56,6 +57,8 @@ public class UpdateClaimStatusCommand(string claimCode, UpdateClaimStatusRequest
                 claim.ClaimCode,
                 claim.Status.ToString(),
                 new { claimCode = claim.ClaimCode, status = claim.Status.ToString() });
+
+            await emailService.SendClaimOutcomeEmailAsync(claim, ct);
 
             return claim.ToUpdateStatusResponse();
         }

@@ -37,6 +37,7 @@ public static class DependencyInjection
             .WithSSL(false)
             .Build());
 
+        services.AddScoped<IEmailNotificationService, EmailNotificationService>();
         services.AddScoped<IMinioStorageService, MinioStorageService>();
         services.AddScoped<IClaimRepository, ClaimRepository>();
         services.AddScoped<IAdminUserRepository, AdminUserRepository>();
