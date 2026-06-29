@@ -1,5 +1,6 @@
 using FluentValidation;
 using MediatR;
+using Microsoft.Extensions.DependencyInjection;
 using Tripcare360.Application.Dtos.Claim;
 using Tripcare360.Application.Features.Claim.Events;
 using Tripcare360.Application.Interfaces.Repositories;
@@ -23,7 +24,7 @@ public class FinalizeClaimCommand(FinalizeClaimRequest request) : IRequest<Final
         }
     }
 
-    public class Handler(IClaimRepository claimRepository, IPublisher publisher)
+    public class Handler(IClaimRepository claimRepository, IServiceScopeFactory scopeFactory)
         : IRequestHandler<FinalizeClaimCommand, FinalizeClaimResponse>
     {
         private static readonly TimeSpan ReservationWindow = TimeSpan.FromMinutes(10);
@@ -45,7 +46,13 @@ public class FinalizeClaimCommand(FinalizeClaimRequest request) : IRequest<Final
 
             await claimRepository.UpdateAsync(claim);
 
-            await publisher.Publish(new ClaimFinalizedNotification(claim.ClaimCode), cancellationToken);
+            var claimCode = claim.ClaimCode;
+            _ = Task.Run(async () =>
+            {
+                using var scope = scopeFactory.CreateScope();
+                var pub = scope.ServiceProvider.GetRequiredService<IPublisher>();
+                await pub.Publish(new ClaimFinalizedNotification(claimCode), CancellationToken.None);
+            });
 
             return claim.ToFinalizeResponse();
         }
