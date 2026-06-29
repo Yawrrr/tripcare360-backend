@@ -17,5 +17,6 @@ public record ClaimDetailResponse(
     string? AdminComments,
     DateTimeOffset? ProcessedAt,
     DateTimeOffset CreatedAt,
-    IReadOnlyList<FileDetailItem> Files
+    IReadOnlyList<FileDetailItem> Files,
+    string CountryCode
 );

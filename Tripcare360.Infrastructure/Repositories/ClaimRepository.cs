@@ -17,4 +17,11 @@ public class ClaimRepository(Tripcare360DbContext db)
         await Db.Claims
             .Where(c => c.Status == ClaimStatus.Pending && c.CreatedAt < cutoff)
             .ToListAsync(ct);
+
+    public async Task<IReadOnlyList<ClaimEntity>> GetByIdentityNumberAsync(
+        string identityNumber, CancellationToken ct = default) =>
+        await Db.Claims
+            .Where(c => c.IdentityNumber.ToLower() == identityNumber.ToLower())
+            .OrderByDescending(c => c.CreatedAt)
+            .ToListAsync(ct);
 }

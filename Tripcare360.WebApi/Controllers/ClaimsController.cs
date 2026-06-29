@@ -7,6 +7,7 @@ using Tripcare360.Application.Features.Claim.Queries;
 using Tripcare360.Application.Features.Flight.Queries;
 using Tripcare360.Application.Interfaces.Services;
 using Tripcare360.WebApi.Models;
+using System.Collections.Generic;
 
 namespace Tripcare360.WebApi.Controllers;
 
@@ -36,7 +37,8 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
             input.SubmittedAmount,
             input.IncidentDetailsJson,
             files,
-            input.Country);
+            input.Country,
+            input.InsuredEmail);
 
         return await sender.Send(new PreValidateAndReserveCommand(request), ct);
     }
@@ -50,6 +52,11 @@ public class ClaimsController(ISender sender, ISseEventBroadcaster sseBroadcaste
     public async Task<FinalizeClaimResponse> Finalize(
         [FromBody] FinalizeClaimRequest request, CancellationToken ct)
         => await sender.Send(new FinalizeClaimCommand(request), ct);
+
+    [HttpGet("history")]
+    public async Task<IReadOnlyList<ClaimHistoryItemResponse>> GetClaimHistory(
+        [FromQuery] string identityNumber, CancellationToken ct)
+        => await sender.Send(new GetClaimHistoryQuery(identityNumber), ct);
 
     [HttpGet("{claimCode}")]
     public async Task<ClaimStatusResponse> GetStatus(string claimCode, CancellationToken ct)

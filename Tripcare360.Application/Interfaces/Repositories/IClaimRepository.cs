@@ -6,4 +6,5 @@ public interface IClaimRepository : IGenericRepository<ClaimEntity>
 {
     Task<ClaimEntity?> GetByClaimCodeAsync(string claimCode);
     Task<IReadOnlyList<ClaimEntity>> GetExpiredPendingAsync(DateTimeOffset cutoff, CancellationToken ct = default);
+    Task<IReadOnlyList<ClaimEntity>> GetByIdentityNumberAsync(string identityNumber, CancellationToken ct = default);
 }

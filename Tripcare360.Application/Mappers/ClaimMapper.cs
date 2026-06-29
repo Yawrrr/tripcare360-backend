@@ -43,7 +43,8 @@ public static class ClaimMapper
             claim.Status.ToString(),
             claim.CalculatedPayout,
             claim.CreatedAt,
-            claim.IsPreValidationFailedDueToOutage
+            claim.IsPreValidationFailedDueToOutage,
+            claim.Country
         );
 
     public static ClaimDetailResponse ToDetailResponse(
@@ -65,7 +66,18 @@ public static class ClaimMapper
             claim.AdminComments,
             claim.ProcessedAt,
             claim.CreatedAt,
-            files
+            files,
+            claim.Country
+        );
+
+    public static ClaimHistoryItemResponse ToHistoryItemResponse(this ClaimEntity claim) =>
+        new(
+            claim.ClaimCode,
+            claim.Type.ToString(),
+            claim.Status.ToString(),
+            claim.CalculatedPayout,
+            claim.CreatedAt,
+            claim.ProcessedAt
         );
 
     public static UpdateClaimStatusResponse ToUpdateStatusResponse(this ClaimEntity claim) =>
