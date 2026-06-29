@@ -130,6 +130,7 @@ public class PreValidateAndReserveCommand(ReservationRequest request) : IRequest
                 PolicyNumber = req.PolicyNumber,
                 IdentityNumber = req.IdentityNumber,
                 InsuredName = req.InsuredName,
+                InsuredEmail = req.InsuredEmail,
                 Route = req.Route,
                 Tier = req.Tier,
                 InsuredAge = req.InsuredAge,

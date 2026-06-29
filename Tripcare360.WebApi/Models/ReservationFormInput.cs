@@ -16,4 +16,5 @@ public class ReservationFormInput
     public List<IFormFile>? SupportingFiles { get; set; }
     public List<string>? SupportingFileLabels { get; set; }
     public string Country { get; set; } = string.Empty;
+    public string? InsuredEmail { get; set; }
 }

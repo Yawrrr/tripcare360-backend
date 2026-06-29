@@ -21,6 +21,7 @@ public class ClaimEntity : BaseEntity
     public List<string> FileLabels { get; set; } = [];
     public required string Country { get; set; }
     public bool IsPreValidationFailedDueToOutage { get; set; } = false;
+    public string? InsuredEmail { get; set; }
     public string? AdminComments { get; set; }
     public ClaimStatus Status { get; set; } = ClaimStatus.Pending;
     public DateTimeOffset? ProcessedAt { get; set; }

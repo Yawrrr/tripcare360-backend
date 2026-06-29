@@ -11,5 +11,6 @@ public record VerifyPolicyResponse(
     PolicyTier Tier,
     DateTime StartDate,
     DateTime EndDate,
-    List<string> EligibleClaimTypes
+    List<string> EligibleClaimTypes,
+    string? InsuredEmail
 );

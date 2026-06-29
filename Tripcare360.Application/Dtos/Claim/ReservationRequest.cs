@@ -13,5 +13,6 @@ public record ReservationRequest(
     decimal SubmittedAmount,
     string IncidentDetailsJson,
     List<ClaimFileUpload> SupportingFiles,
-    string Country
+    string Country,
+    string? InsuredEmail
 );
