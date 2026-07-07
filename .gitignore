@@ -11,6 +11,7 @@ obj/
 
 ## Local environment overrides — never commit
 appsettings.Local.json
+deploy/.env
 
 ## OS
 .DS_Store

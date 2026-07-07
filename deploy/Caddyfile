@@ -1,0 +1,16 @@
+# Caddy auto-provisions Let's Encrypt certificates for both hosts.
+# DOMAIN comes from the .env file via docker-compose.
+
+api.{$DOMAIN} {
+	reverse_proxy webapi:8080 {
+		# Stream SSE responses immediately instead of buffering
+		flush_interval -1
+	}
+}
+
+# MinIO must be publicly reachable because presigned URLs are opened
+# directly by the browser. Caddy preserves the Host header by default,
+# which keeps the S3 signature valid.
+files.{$DOMAIN} {
+	reverse_proxy minio:9000
+}

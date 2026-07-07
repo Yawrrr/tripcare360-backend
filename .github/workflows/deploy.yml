@@ -1,0 +1,77 @@
+name: Build & Deploy Backend
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE: ghcr.io/${{ github.repository_owner }}/tripcare360-webapi
+  DOMAIN: tripcare360.me
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          tags: |
+            ${{ env.IMAGE }}:latest
+            ${{ env.IMAGE }}:${{ github.sha }}
+
+      - name: Copy compose files to VM
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          source: "deploy/docker-compose.yml,deploy/Caddyfile"
+          target: tripcare360
+
+      - name: Render .env and restart stack
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VM_HOST }}
+          username: ${{ secrets.VM_USER }}
+          key: ${{ secrets.VM_SSH_KEY }}
+          script: |
+            set -e
+            cd ~/tripcare360/deploy
+
+            # Runtime secrets come from GitHub repo secrets — never baked
+            # into the image, never committed. Compose injects them as env
+            # vars into the containers.
+            cat > .env <<'ENVEOF'
+            DOMAIN=${{ env.DOMAIN }}
+            WEBAPI_IMAGE=${{ env.IMAGE }}:${{ github.sha }}
+            SQL_CONNECTION_STRING=${{ secrets.SQL_CONNECTION_STRING }}
+            JWT_SECRET=${{ secrets.JWT_SECRET }}
+            EXTERNAL_SERVICES_BASE_URL=${{ secrets.EXTERNAL_SERVICES_BASE_URL }}
+            MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
+            MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
+            ENVEOF
+            chmod 600 .env
+
+            # GITHUB_TOKEN is valid for the duration of this job — enough to
+            # pull the private image we just pushed
+            echo '${{ secrets.GITHUB_TOKEN }}' | docker login ghcr.io -u '${{ github.actor }}' --password-stdin
+
+            docker compose pull webapi
+            docker compose up -d --remove-orphans
+            docker image prune -f

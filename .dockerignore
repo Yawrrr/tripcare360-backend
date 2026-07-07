@@ -1,0 +1,14 @@
+**/bin/
+**/obj/
+.vs/
+.git/
+.github/
+deploy/
+docker-compose.yml
+*.user
+*.Backup.tmp
+
+# Local/dev config must never reach the image — Program.cs loads
+# appsettings.Local.json AFTER env vars, so it would override them
+**/appsettings.Local.json
+**/appsettings.Development.json

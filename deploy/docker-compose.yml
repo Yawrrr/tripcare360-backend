@@ -1,0 +1,71 @@
+services:
+  webapi:
+    # CI sets WEBAPI_IMAGE in .env to the GHCR tag it just pushed;
+    # for a manual local build run `docker compose up -d --build` instead
+    image: ${WEBAPI_IMAGE:-tripcare360-webapi:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    container_name: tripcare360-webapi
+    restart: unless-stopped
+    environment:
+      ASPNETCORE_ENVIRONMENT: Production
+      ConnectionStrings__DefaultConnection: ${SQL_CONNECTION_STRING}
+      Jwt__Secret: ${JWT_SECRET}
+      Jwt__Issuer: tripcare360-api
+      Jwt__Audience: tripcare360-web
+      Jwt__LifetimeMinutes: "480"
+      ExternalServices__BaseUrl: ${EXTERNAL_SERVICES_BASE_URL}
+      MinIO__Endpoint: files.${DOMAIN}
+      MinIO__UseSSL: "true"
+      MinIO__AccessKey: ${MINIO_ACCESS_KEY}
+      MinIO__SecretKey: ${MINIO_SECRET_KEY}
+      MinIO__BucketName: tripcare360-supporting-docs
+      Email__SmtpHost: mailpit
+      Email__SmtpPort: "1025"
+      Email__FromAddress: no-reply@etiqa.com
+      Email__FromName: TripCare360 Claims
+      Cors__AllowedOrigins__0: http://localhost:3002
+      Cors__AllowedOrigins__1: https://tripcare360.me
+      Cors__AllowedOrigins__2: https://www.tripcare360.me
+    depends_on:
+      - minio
+      - mailpit
+
+  minio:
+    image: minio/minio:latest
+    container_name: tripcare360-minio
+    restart: unless-stopped
+    command: server /data
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+    volumes:
+      - minio-data:/data
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: tripcare360-mailpit
+    restart: unless-stopped
+    ports:
+      # UI reachable only via SSH tunnel: ssh -L 8025:localhost:8025 <vm>
+      - "127.0.0.1:8025:8025"
+
+  caddy:
+    image: caddy:2
+    container_name: tripcare360-caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  minio-data:
+  caddy-data:
+  caddy-config:
