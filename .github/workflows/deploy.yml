@@ -6,7 +6,9 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE: ghcr.io/${{ github.repository_owner }}/tripcare360-webapi
+  # Docker/GHCR image names must be lowercase — github.repository_owner
+  # preserves the account's display casing (Yawrrr), so it's hardcoded here
+  IMAGE: ghcr.io/yawrrr/tripcare360-webapi
   DOMAIN: tripcare360.me
 
 jobs:
