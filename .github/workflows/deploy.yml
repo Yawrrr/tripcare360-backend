@@ -67,6 +67,8 @@ jobs:
             EXTERNAL_SERVICES_BASE_URL=${{ secrets.EXTERNAL_SERVICES_BASE_URL }}
             MINIO_ACCESS_KEY=${{ secrets.MINIO_ACCESS_KEY }}
             MINIO_SECRET_KEY=${{ secrets.MINIO_SECRET_KEY }}
+            MAILPIT_USER=${{ secrets.MAILPIT_USER }}
+            MAILPIT_PASSWORD_HASH=${{ secrets.MAILPIT_PASSWORD_HASH }}
             ENVEOF
             chmod 600 .env
 

@@ -14,3 +14,12 @@ api.{$DOMAIN} {
 files.{$DOMAIN} {
 	reverse_proxy minio:9000
 }
+
+# Mailpit has no login of its own — gate it behind HTTP Basic Auth so the
+# captured test emails aren't readable by anyone with the URL.
+mail.{$DOMAIN} {
+	basic_auth {
+		{$MAILPIT_USER} {$MAILPIT_PASSWORD_HASH}
+	}
+	reverse_proxy mailpit:8025
+}

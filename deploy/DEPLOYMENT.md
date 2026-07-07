@@ -6,12 +6,14 @@ Target architecture — smallest footprint that runs the whole stack:
 Namecheap DNS (tripcare360.me)
   api.tripcare360.me   ──A──►  Azure VM public IP
   files.tripcare360.me ──A──►  Azure VM public IP
+  mail.tripcare360.me  ──A──►  Azure VM public IP
 
 ┌─ Azure VM: Ubuntu 24.04, Standard_B1s (FREE 750 h/month, first 12 months) ─┐
 │  Caddy (80/443, auto-HTTPS via Let's Encrypt)                              │
-│    ├─► api.…   → webapi container (:8080)                                  │
-│    └─► files.… → minio container (:9000)   [presigned URLs for browser]    │
-│  mailpit (UI on 127.0.0.1:8025 — view via SSH tunnel)                      │
+│    ├─► api.…  → webapi container (:8080)                                   │
+│    ├─► files.… → minio container (:9000)   [presigned URLs for browser]    │
+│    └─► mail.…  → mailpit container (:8025) [HTTP Basic Auth-gated]         │
+│  mailpit also reachable at 127.0.0.1:8025 via SSH tunnel, no auth needed   │
 └─────────────────────────────────────────────────────────────────────────────┘
         │
         ▼
@@ -94,6 +96,7 @@ Namecheap dashboard → Domain List → **tripcare360.me** → Advanced DNS → 
 |----------|---------|------------------|-----------|
 | A Record | `api`   | `<VM public IP>` | Automatic |
 | A Record | `files` | `<VM public IP>` | Automatic |
+| A Record | `mail`  | `<VM public IP>` | Automatic |
 
 Wait until `nslookup api.tripcare360.me` resolves (usually < 5 min). Caddy can
 only obtain certificates **after** DNS resolves — don't start the stack before.
@@ -145,6 +148,8 @@ secret**, add all of these:
 | `EXTERNAL_SERVICES_BASE_URL` | Public URL of the hosted mock server (this keeps it out of the repo) |
 | `MINIO_ACCESS_KEY` | New value, e.g. `tripcareAdmin` |
 | `MINIO_SECRET_KEY` | New strong random value |
+| `MAILPIT_USER` | Username for the Mailpit UI, e.g. `admin` |
+| `MAILPIT_PASSWORD_HASH` | Bcrypt hash for the Mailpit UI password — see step 6 for how to generate it |
 
 The domain is not a secret — it's set as `DOMAIN: tripcare360.me` at the top
 of the workflow file.
@@ -200,7 +205,25 @@ curl -i https://files.tripcare360.me
 docker compose logs -f webapi
 ```
 
-Mailpit UI (view "sent" emails) — from your own machine:
+## 6a. Mailpit UI (view "sent" emails)
+
+**Public URL** (needs `MAILPIT_USER`/`MAILPIT_PASSWORD_HASH` secrets set and the
+`mail` DNS record from step 2): open `https://mail.tripcare360.me`, log in with
+the browser's Basic Auth prompt using `MAILPIT_USER` and the plaintext password
+you hashed.
+
+To generate the hash for a chosen password (run once, on the VM, using the
+`caddy` image already pulled by the stack):
+
+```bash
+ssh azureuser@<VM public IP>
+docker run --rm caddy:2 caddy hash-password --plaintext 'YourChosenPassword'
+```
+
+Copy the output (starts with `$2a$...`) into the `MAILPIT_PASSWORD_HASH` GitHub
+secret, then re-run the deploy workflow so Caddy picks it up.
+
+**Alternative — SSH tunnel** (no public exposure, no secrets needed):
 
 ```bash
 ssh -L 8025:localhost:8025 azureuser@<VM public IP>
@@ -246,6 +269,7 @@ cd ~/tripcare360/deploy && docker compose up -d --build
 | JWT secret (new, not the Local.json one) | GitHub secret → VM `.env` | No |
 | Mock server URL | GitHub secret → VM `.env` | No |
 | MinIO credentials | GitHub secret → VM `.env` | No |
+| Mailpit basic-auth user + password hash | GitHub secret → VM `.env` | No |
 | VM SSH private key | GitHub secret only | No |
 
 To rotate any secret: update it in GitHub → re-run the workflow. The `.env`
