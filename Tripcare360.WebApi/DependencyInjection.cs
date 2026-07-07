@@ -19,8 +19,11 @@ public static class DependencyInjection
                 o.JsonSerializerOptions.Converters.Add(new JsonStringEnumConverter()));
         services.AddEndpointsApiExplorer();
 
+        var corsOrigins = config.GetSection("Cors:AllowedOrigins").Get<string[]>()
+            ?? ["http://localhost:3002"];
+
         services.AddCors(o => o.AddPolicy("AllowNextJs", p =>
-            p.WithOrigins("http://localhost:3002")
+            p.WithOrigins(corsOrigins)
              .AllowAnyMethod()
              .AllowAnyHeader()
              .AllowCredentials()));

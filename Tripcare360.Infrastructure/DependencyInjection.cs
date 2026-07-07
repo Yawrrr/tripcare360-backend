@@ -34,7 +34,7 @@ public static class DependencyInjection
             .WithCredentials(
                 config["MinIO:AccessKey"] ?? "tripcareAdmin",
                 config["MinIO:SecretKey"] ?? "tripcarePassword123")
-            .WithSSL(false)
+            .WithSSL(config.GetValue("MinIO:UseSSL", false))
             .Build());
 
         services.AddScoped<IEmailNotificationService, EmailNotificationService>();
