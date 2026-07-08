@@ -17,10 +17,15 @@ services:
       Jwt__LifetimeMinutes: "480"
       ExternalServices__BaseUrl: ${EXTERNAL_SERVICES_BASE_URL}
       # Internal Docker network — fast, no external DNS/TLS dependency for
-      # server-to-server calls. Presigned URLs handed to the browser still
-      # use the public files.{$DOMAIN} host via MINIO_SERVER_URL below.
+      # server-to-server calls (uploads, bucket checks).
       MinIO__Endpoint: minio:9000
       MinIO__UseSSL: "false"
+      # Presigned URLs are signed client-side against whatever endpoint is
+      # configured, so the browser-facing link must be built with the public
+      # host explicitly — MINIO_SERVER_URL on the minio container has no
+      # effect on the .NET SDK's presigned URL generation.
+      MinIO__PublicEndpoint: files.${DOMAIN}
+      MinIO__PublicUseSSL: "true"
       MinIO__AccessKey: ${MINIO_ACCESS_KEY}
       MinIO__SecretKey: ${MINIO_SECRET_KEY}
       MinIO__BucketName: tripcare360-supporting-docs
@@ -43,8 +48,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
-      # Makes MinIO generate presigned URLs against the public HTTPS host,
-      # even though clients connect to it internally via minio:9000
+      # Sets MinIO's own canonical public URL (console links, notifications).
+      # Does NOT affect presigned URLs from the .NET SDK — those are signed
+      # client-side using MinIO__PublicEndpoint on the webapi service above.
       MINIO_SERVER_URL: https://files.${DOMAIN}
     volumes:
       - minio-data:/data
