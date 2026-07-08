@@ -16,8 +16,11 @@ services:
       Jwt__Audience: tripcare360-web
       Jwt__LifetimeMinutes: "480"
       ExternalServices__BaseUrl: ${EXTERNAL_SERVICES_BASE_URL}
-      MinIO__Endpoint: files.${DOMAIN}
-      MinIO__UseSSL: "true"
+      # Internal Docker network — fast, no external DNS/TLS dependency for
+      # server-to-server calls. Presigned URLs handed to the browser still
+      # use the public files.{$DOMAIN} host via MINIO_SERVER_URL below.
+      MinIO__Endpoint: minio:9000
+      MinIO__UseSSL: "false"
       MinIO__AccessKey: ${MINIO_ACCESS_KEY}
       MinIO__SecretKey: ${MINIO_SECRET_KEY}
       MinIO__BucketName: tripcare360-supporting-docs
@@ -40,6 +43,9 @@ services:
     environment:
       MINIO_ROOT_USER: ${MINIO_ACCESS_KEY}
       MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY}
+      # Makes MinIO generate presigned URLs against the public HTTPS host,
+      # even though clients connect to it internally via minio:9000
+      MINIO_SERVER_URL: https://files.${DOMAIN}
     volumes:
       - minio-data:/data
 
